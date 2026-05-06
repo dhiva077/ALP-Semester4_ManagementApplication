@@ -5,9 +5,33 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
+    public function login(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'string', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $user = User::query()
+            ->where('email', $validated['email'])
+            ->first();
+
+        if (!$user || !Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Email atau password salah.',
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Login berhasil.',
+            'user' => $user,
+        ]);
+    }
+
     public function index()
     {
         return response()->json(
