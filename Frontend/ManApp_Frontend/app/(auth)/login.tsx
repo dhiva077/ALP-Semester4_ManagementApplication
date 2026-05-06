@@ -7,14 +7,50 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
+
+type GoogleOauthConfig = {
+  clientId?: string;
+  expoClientId?: string;
+  androidClientId?: string;
+  iosClientId?: string;
+  webClientId?: string;
+};
+
+type GoogleUser = {
+  id?: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+};
+
+type BackendLoginPayload = {
+  message?: string;
+  user?: {
+    id?: string;
+    name?: string;
+    email?: string;
+  };
+};
+
+const resolveApiBaseUrl = () => {
+  const configuredBaseUrl = Constants.expoConfig?.extra?.apiBaseUrl;
+
+  if (typeof configuredBaseUrl === 'string' && configuredBaseUrl.trim()) {
+    return configuredBaseUrl.replace(/\/+$/, '');
+  }
+
+  return Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
+};
 
 export default function Login() {
   const router = useRouter();
@@ -24,11 +60,30 @@ export default function Login() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [googleAuthInProgress, setGoogleAuthInProgress] = useState(false);
+
+  const googleConfig =
+    (Constants.expoConfig?.extra?.googleOauth as GoogleOauthConfig | undefined) ??
+    {};
+  const isExpoGo = Constants.appOwnership === 'expo';
+  const fallbackClientId =
+    '520666620714-ckgbal9fel0nnonbgb0df9c0n3sutn4p.apps.googleusercontent.com';
+  const expoClientId =
+    googleConfig.clientId ?? googleConfig.expoClientId ?? fallbackClientId;
+  const webClientId = googleConfig.webClientId ?? fallbackClientId;
+  const isGoogleConfigured = isExpoGo
+    ? !!expoClientId
+    : Platform.OS === 'android'
+      ? !!googleConfig.androidClientId
+      : Platform.OS === 'ios'
+        ? !!googleConfig.iosClientId
+        : !!webClientId;
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    webClientId: 'YOUR_WEB_CLIENT_ID',
+    clientId: expoClientId ?? 'missing-client-id',
+    androidClientId: googleConfig.androidClientId ?? 'missing-android-client-id',
+    iosClientId: googleConfig.iosClientId ?? 'missing-ios-client-id',
+    webClientId,
   });
 
   useEffect(() => {
@@ -41,9 +96,41 @@ export default function Login() {
     }
   }, [response]);
 
+  const handleGoogleLogin = async (user: GoogleUser) => {
+    if (!user.email) {
+      Alert.alert(
+        'Login Ditolak',
+        'Email Google tidak ditemukan.',
+        [{ text: 'Coba Lagi', onPress: () => setGoogleAuthInProgress(false) }]
+      );
+      return;
+    }
+
+    const normalizedEmail = user.email.toLowerCase();
+
+    if (!normalizedEmail.endsWith('@ciputra.ac.id')) {
+      Alert.alert(
+        'Login Ditolak',
+        'Hanya akun UC Staff dengan domain @ciputra.ac.id yang dapat digunakan.',
+        [{ text: 'Coba Lagi', onPress: () => setGoogleAuthInProgress(false) }]
+      );
+      return;
+    }
+
+    setGoogleAuthInProgress(false);
+
+    await AsyncStorage.multiSet([
+      ['isLoggedIn', 'true'],
+      ['authProvider', 'google'],
+      ['user', JSON.stringify({ ...user, email: normalizedEmail })],
+    ]);
+
+    router.replace('/(tabs)/dashboard');
+  };
+
   const fetchUserInfo = async (token: string) => {
     try {
-      const response = await fetch(
+      const userResponse = await fetch(
         'https://www.googleapis.com/oauth2/v2/userinfo',
         {
           headers: {
@@ -52,21 +139,20 @@ export default function Login() {
         }
       );
 
-      const user = await response.json();
-
-      if (
-        user.email &&
-        user.email.toLowerCase().endsWith('@staffpm.ciputra.ac.id')
-      ) {
-        await handleLogin();
-      } else {
-        Alert.alert(
-          'Login Ditolak',
-          'Hanya akun UC Staff dengan domain @staffPM.ciputra.ac.id yang dapat digunakan.'
-        );
+      if (!userResponse.ok) {
+        throw new Error('Google userinfo request failed.');
       }
+
+      const user: GoogleUser = await userResponse.json();
+
+      await handleGoogleLogin(user);
     } catch (error) {
-      Alert.alert('Error', 'Gagal mengambil data akun Google.');
+      setGoogleAuthInProgress(false);
+      Alert.alert(
+        'Error',
+        'Gagal mengambil data akun Google.',
+        [{ text: 'Coba Lagi', onPress: () => setGoogleAuthInProgress(false) }]
+      );
     }
   };
 
@@ -76,21 +162,61 @@ export default function Login() {
       return;
     }
 
-    if (!email.toLowerCase().endsWith('@staffpm.ciputra.ac.id')) {
+    const normalizedEmail = email.toLowerCase();
+
+    if (!normalizedEmail.endsWith('@ciputra.ac.id')) {
       Alert.alert(
         'Login Ditolak',
-        'Gunakan email UC Staff dengan domain @staffPM.ciputra.ac.id'
+        'Gunakan email UC Staff dengan domain @ciputra.ac.id'
       );
       return;
     }
 
     setIsLoading(true);
 
-    setTimeout(async () => {
-      await AsyncStorage.setItem('isLoggedIn', 'true');
-      setIsLoading(false);
+    try {
+      const loginResponse = await fetch(`${resolveApiBaseUrl()}/api/login`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password,
+        }),
+      });
+
+      const payload: BackendLoginPayload | null = await loginResponse
+        .json()
+        .catch(() => null);
+
+      if (!loginResponse.ok) {
+        throw new Error(payload?.message ?? 'Email atau password tidak valid.');
+      }
+
+      await AsyncStorage.multiSet([
+        ['isLoggedIn', 'true'],
+        ['authProvider', 'local'],
+        [
+          'user',
+          JSON.stringify({
+            id: payload?.user?.id,
+            name: payload?.user?.name,
+            email: payload?.user?.email ?? normalizedEmail,
+          }),
+        ],
+      ]);
+
       router.replace('/(tabs)/dashboard');
-    }, 1200);
+    } catch (error) {
+      Alert.alert(
+        'Login Gagal',
+        error instanceof Error ? error.message : 'Terjadi kesalahan saat login.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -139,7 +265,7 @@ export default function Login() {
         </View>
 
         <Text style={styles.infoSubText}>
-          Gunakan email dengan domain @staffPM.ciputra.ac.id
+          Gunakan email dengan domain @ciputra.ac.id
         </Text>
 
         <TouchableOpacity
@@ -162,8 +288,19 @@ export default function Login() {
 
         <TouchableOpacity
           style={[styles.googleButton, !request && { opacity: 0.5 }]}
-          onPress={() => promptAsync()}
-          disabled={!request}
+          onPress={() => {
+            if (!isGoogleConfigured) {
+              Alert.alert(
+                'Google Sign-In belum dikonfigurasi',
+                'Isi client ID Google di app.json (extra.googleOauth).'
+              );
+              return;
+            }
+
+            setGoogleAuthInProgress(true);
+            promptAsync();
+          }}
+          disabled={!request || googleAuthInProgress}
         >
           <Text style={styles.googleText}>Sign in with Google</Text>
         </TouchableOpacity>
