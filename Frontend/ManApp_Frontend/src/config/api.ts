@@ -4,12 +4,12 @@ import { Platform } from 'react-native';
  * API Configuration yang mendukung berbagai environment
  * 
  * - Web: http://localhost:8000
- * - Physical Android/iOS Device: http://192.168.1.11:8000 (IP lokal PC)
+ * - Physical Android/iOS Device: http://localhost:8000 (IP lokal PC)
  * - Android Emulator: http://10.0.2.2:8000 (special address untuk localhost)
  */
 
 // IP lokal PC Anda - ubah sesuai kebutuhan
-const LOCAL_PC_IP = '192.168.1.11';
+const LOCAL_PC_IP = '127.0.0.1';
 const PORT = '8000';
 
 let API_BASE_URL: string;
