@@ -29,7 +29,7 @@ class UserController extends Controller
         return response()->json([
             'message' => 'Login berhasil.',
             'user' => $user,
-        ]);
+        ], 200);
     }
 
     public function index()
@@ -52,9 +52,15 @@ class UserController extends Controller
             'password' => ['required', 'string', 'min:8'],
         ]);
 
+        // Hash password sebelum create
+        $validated['password'] = Hash::make($validated['password']);
+
         $user = User::create($validated);
 
-        return response()->json($user, 201);
+        return response()->json([
+            'message' => 'User berhasil dibuat.',
+            'user' => $user,
+        ], 201);
     }
 
     public function update(Request $request, User $user)
@@ -72,10 +78,18 @@ class UserController extends Controller
             'password' => ['sometimes', 'required', 'string', 'min:8'],
         ]);
 
+        // Hash password jika ada update password
+        if (isset($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        }
+
         $user->fill($validated);
         $user->save();
 
-        return response()->json($user);
+        return response()->json([
+            'message' => 'User berhasil diupdate.',
+            'user' => $user,
+        ]);
     }
 
     public function destroy(User $user)

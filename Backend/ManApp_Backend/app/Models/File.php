@@ -5,21 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class File extends Model
 {
-    /** @use HasUuids */
-    use HasUuids;
-
     /**
      * The table associated with the model.
      *
      * @var string
      */
     protected $table = 'files';
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     /**
      * The "booted" method of the model.

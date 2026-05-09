@@ -22,22 +22,24 @@ export default function useLoginViewModel() {
       return;
     }
 
-    if (!email.toLowerCase().endsWith('@staffpm.ciputra.ac.id')) {
-      Alert.alert(
-        'Login Ditolak',
-        'Gunakan email UC Staff dengan domain @staffPM.ciputra.ac.id'
-      );
+    const normalized = email.toLowerCase();
+    const allowed = ['@ciputra.ac.id', '@staffpm.ciputra.ac.id', '@student.ciputra.ac.id'];
+    if (!allowed.some(d => normalized.endsWith(d))) {
+      Alert.alert('Login Ditolak', 'Gunakan email UC Staff dengan domain yang valid.');
       return;
     }
 
     try {
       setIsLoading(true);
 
-      await loginService();
-
-      router.replace('/(tabs)/dashboard');
+      const user = await loginService(email, password);
+      if (user) {
+        router.replace('/(tabs)/dashboard');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Login gagal');
+      const errorMsg = error instanceof Error ? error.message : 'Login gagal';
+      console.log('Login error:', errorMsg); // Log untuk debugging
+      Alert.alert('Login Gagal', errorMsg);
     } finally {
       setIsLoading(false);
     }
