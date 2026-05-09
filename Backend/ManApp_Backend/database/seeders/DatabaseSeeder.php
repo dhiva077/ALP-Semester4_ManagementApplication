@@ -51,5 +51,7 @@ class DatabaseSeeder extends Seeder
             'code' => 'S',
             'status' => 'Selesai',
         ]);
+
+        $this->call(EventSeeder::class);
     }
 }

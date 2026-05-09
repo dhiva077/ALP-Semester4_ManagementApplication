@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Status extends Model
 {
-    /** @use HasUuids, HasFactory */
-    use HasUuids, HasFactory;
+    /** @use HasFactory */
+    use HasFactory;
 
     /**
      * The table associated with the model.
@@ -19,8 +19,6 @@ class Status extends Model
      * @var string
      */
     protected $table = 'status';
-    protected $keyType = 'string';
-    public $incrementing = false;
     public $timestamps = false;
 
     /**

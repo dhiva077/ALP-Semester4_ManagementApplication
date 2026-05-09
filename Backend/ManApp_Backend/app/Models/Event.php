@@ -3,16 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Event extends Model
 {
-    /** @use Notifiable, HasUuids */
-    use Notifiable, HasUuids;
+    /** @use Notifiable, HasFactory */
+    use Notifiable, HasFactory;
 
     /**
      * The table associated with the model.
@@ -20,8 +20,6 @@ class Event extends Model
      * @var string
      */
     protected $table = 'events';
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     /**
      * The "booted" method of the model.
