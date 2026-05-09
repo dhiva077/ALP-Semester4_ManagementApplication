@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-
-import { loginService } from '../services/authService';
 
 export default function useLoginViewModel() {
   const router = useRouter();
@@ -17,25 +16,21 @@ export default function useLoginViewModel() {
   };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Harap isi email dan password.');
-      return;
-    }
-
-    const normalized = email.toLowerCase();
-    const allowed = ['@ciputra.ac.id', '@staffpm.ciputra.ac.id', '@student.ciputra.ac.id'];
-    if (!allowed.some(d => normalized.endsWith(d))) {
-      Alert.alert('Login Ditolak', 'Gunakan email UC Staff dengan domain yang valid.');
-      return;
-    }
-
     try {
       setIsLoading(true);
 
-      const user = await loginService(email, password);
-      if (user) {
-        router.replace('/(tabs)/dashboard');
-      }
+      const userData = {
+        name: 'Frontend Demo User',
+        email: 'demo@ciputra.ac.id',
+      };
+
+      await AsyncStorage.multiSet([
+        ['isLoggedIn', 'true'],
+        ['authProvider', 'frontend-only'],
+        ['user', JSON.stringify(userData)],
+      ]);
+
+      router.replace('/(tabs)/dashboard');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Login gagal';
       console.log('Login error:', errorMsg); // Log untuk debugging
