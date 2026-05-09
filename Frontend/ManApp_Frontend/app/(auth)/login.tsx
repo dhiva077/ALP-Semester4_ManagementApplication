@@ -10,13 +10,15 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 
 import useLoginViewModel from '../../src/viewmodels/useLoginViewModel';
+import { googleSignInService } from '../../src/services/authService';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type GoogleOauthConfig = {
   clientId?: string;
@@ -68,9 +70,9 @@ export default function Login() {
         : !!webClientId;
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: expoClientId ?? 'missing-client-id',
-    androidClientId: googleConfig.androidClientId ?? 'missing-android-client-id',
-    iosClientId: googleConfig.iosClientId ?? 'missing-ios-client-id',
+    clientId: expoClientId,
+    androidClientId: googleConfig.androidClientId,
+    iosClientId: googleConfig.iosClientId,
     webClientId,
   });
 
@@ -92,27 +94,26 @@ export default function Login() {
       );
       return;
     }
-
     const normalizedEmail = user.email.toLowerCase();
-
-    if (!normalizedEmail.endsWith('@ciputra.ac.id')) {
+    const allowed = ['@ciputra.ac.id', '@staffpm.ciputra.ac.id', '@student.ciputra.ac.id'];
+    if (!allowed.some(d => normalizedEmail.endsWith(d))) {
       Alert.alert(
         'Login Ditolak',
-        'Hanya akun UC Staff dengan domain @ciputra.ac.id yang dapat digunakan.',
+        'Hanya akun UC Staff dengan domain yang valid dapat digunakan.',
         [{ text: 'Coba Lagi', onPress: () => setGoogleAuthInProgress(false) }]
       );
       return;
     }
 
-    setGoogleAuthInProgress(false);
-
-    await AsyncStorage.multiSet([
-      ['isLoggedIn', 'true'],
-      ['authProvider', 'google'],
-      ['user', JSON.stringify({ ...user, email: normalizedEmail })],
-    ]);
-
-    router.replace('/(tabs)/dashboard');
+    try {
+      const backendUser = await googleSignInService({ email: normalizedEmail, name: user.name });
+      setGoogleAuthInProgress(false);
+      router.replace('/(tabs)/dashboard');
+    } catch (err) {
+      setGoogleAuthInProgress(false);
+      const errorMsg = err instanceof Error ? err.message : 'Gagal sign-in dengan Google';
+      Alert.alert('Error', errorMsg);
+    }
   };
 
   const fetchUserInfo = async (token: string) => {
