@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,151 +9,222 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 
-const MOCK_NOTIF = [
-  {
-    id: 1,
-    title: 'Mayora Goes to Campus',
-    desc: 'Peringatan H-3 Event! Ayo buruan dicek, masih ada beberapa file yang masih perlu diperhatikan',
-  },
-  {
-    id: 2,
-    title: 'Mayora Goes to Campus',
-    desc: 'Peringatan H-3 Event! Ayo buruan dicek, masih ada beberapa file yang masih perlu diperhatikan',
-  },
-  {
-    id: 3,
-    title: 'Mayora Goes to Campus',
-    desc: 'Peringatan H-3 Event! Ayo buruan dicek, masih ada beberapa file yang masih perlu diperhatikan',
-  },
-  {
-    id: 4,
-    title: 'Mayora Goes to Campus',
-    desc: 'Peringatan H-3 Event! Ayo buruan dicek, masih ada beberapa file yang masih perlu diperhatikan',
-  },
-];
+// Keys sesuai dengan yang digunakan pada fitur Kalender dan Penyimpanan
+const STORAGE_KEY = 'MANAPP_EVENTS';
+const CHECKLIST_KEY = 'CHECKLIST_DATA';
+const DEFAULT_STATUS = ['belum', 'belum', 'belum', 'belum', 'belum', 'belum'];
+
+interface NotificationItem {
+  id: number;
+  eventName: string;
+  eventDate: string;
+  incompleteCount: number;
+  desc: string;
+}
 
 export default function Notifikasi() {
   const router = useRouter();
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  // Fungsi untuk memetakan data dari Kalender & status Penyimpanan
+  const loadNotifications = async () => {
+    try {
+      const savedEvents = await AsyncStorage.getItem(STORAGE_KEY);
+      const savedChecklists = await AsyncStorage.getItem(CHECKLIST_KEY);
+      
+      const events = savedEvents ? JSON.parse(savedEvents) : {};
+      const checklistData = savedChecklists ? JSON.parse(savedChecklists) : {};
+
+      const list: NotificationItem[] = [];
+
+      // Iterasi setiap tanggal di kalender
+      Object.entries(events).forEach(([date, items]) => {
+        const eventList = items as any[];
+        
+        eventList.forEach((item) => {
+          // Ambil status checklist dari penyimpanan berdasarkan judul event
+          const statusArray = checklistData[item.title] || DEFAULT_STATUS;
+          
+          // Hitung berapa banyak file yang belum 'selesai'
+          const incompleteCount = statusArray.filter((status: string) => status !== 'selesai').length;
+
+          // Hanya masukkan ke notifikasi jika masih ada file yang belum lengkap
+          if (incompleteCount > 0) {
+            list.push({
+              id: item.id,
+              eventName: item.title,
+              eventDate: date,
+              incompleteCount,
+              desc: `Peringatan! Ayo buruan dicek, masih ada ${incompleteCount} file yang masih perlu diperhatikan`,
+            });
+          }
+        });
+      });
+
+      // Urutkan berdasarkan tanggal terdekat
+      setNotifications(list.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()));
+    } catch (error) {
+      console.error("Gagal memuat notifikasi:", error);
+    }
+  };
+
+  // Reload data setiap kali halaman fokus
+  useFocusEffect(
+    useCallback(() => {
+      loadNotifications();
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* HEADER SESUAI GAMBAR */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.push('/(tabs)/dashboard')}
         >
           <Ionicons name="chevron-back" size={28} color="#fff" />
         </TouchableOpacity>
-
         <Text style={styles.headerTitle}>Notifikasi</Text>
-
         <View style={styles.spacer} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
         showsVerticalScrollIndicator={false}
       >
-        {MOCK_NOTIF.map((item) => (
-          <View key={item.id} style={styles.notifCard}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="folder" size={32} color="#5D4037" />
-            </View>
+        {notifications.length > 0 ? (
+          notifications.map((item, index) => (
+            <TouchableOpacity
+              key={`${item.eventName}-${index}`}
+              style={styles.notifCard}
+              activeOpacity={0.8}
+              onPress={() => router.push({
+                pathname: '/(tabs)/notifikasi-detail',
+                params: {
+                  eventName: item.eventName,
+                  eventDate: item.eventDate,
+                },
+              })}
+            >
+              {/* ICON FOLDER COKELAT SESUAI GAMBAR */}
+              <View style={styles.iconContainer}>
+                <Ionicons name="folder" size={38} color="#5D4037" />
+              </View>
 
-            <View style={styles.textContainer}>
-              <Text style={styles.notifTitle}>{item.title}</Text>
-              <Text style={styles.notifDesc}>{item.desc}</Text>
-            </View>
+              {/* TEKS KONTEN */}
+              <View style={styles.textContainer}>
+                <Text style={styles.notifTitle}>{item.eventName}</Text>
+                <Text style={styles.notifDesc} numberOfLines={2}>
+                  {item.desc}
+                </Text>
+              </View>
 
-            <View style={styles.orangeBadge}>
-              <Text style={styles.badgeText}>1</Text>
-            </View>
+              {/* BADGE ORANYE SESUAI GAMBAR */}
+              <View style={styles.orangeBadge}>
+                <Text style={styles.badgeText}>{item.incompleteCount}</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="notifications-off-outline" size={64} color="#D7CCC8" />
+            <Text style={styles.emptyText}>Semua file sudah lengkap!</Text>
           </View>
-        ))}
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FEF2DB',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F2E3C9' // Warna krem sesuai gambar
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 20, 
+    paddingVertical: 15,
+    marginTop: 10
   },
-  backButton: {
-    backgroundColor: '#FF8C2B',
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
+  backButton: { 
+    backgroundColor: '#FF8C2B', 
+    width: 45, 
+    height: 45, 
+    borderRadius: 22.5, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    elevation: 4 
+  },
+  headerTitle: { 
+    fontSize: 24, 
+    fontWeight: 'bold', 
+    color: '#5D4037' 
+  },
+  spacer: { width: 45 },
+  scrollContent: { 
+    paddingHorizontal: 20, 
+    paddingBottom: 100 // Ruang untuk TabBar
+  },
+  notifCard: { 
+    backgroundColor: '#FFFBF2', 
+    borderRadius: 20, 
+    padding: 18, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 15, 
+    elevation: 3,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#5D4037',
-  },
-  spacer: {
-    width: 45,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  notifCard: {
-    backgroundColor: '#FFFDF0',
-    borderRadius: 15,
-    padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-    elevation: 2,
-    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
   },
-  iconContainer: {
-    marginRight: 12,
+  iconContainer: { 
+    marginRight: 15 
   },
-  textContainer: {
-    flex: 1,
-    marginRight: 10,
+  textContainer: { 
+    flex: 1, 
+    marginRight: 10 
   },
-  notifTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  notifTitle: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
     color: '#5D4037',
-    marginBottom: 4,
+    marginBottom: 4
   },
-  notifDesc: {
-    fontSize: 11,
-    color: '#8D6E63',
-    lineHeight: 16,
+  notifDesc: { 
+    fontSize: 12, 
+    color: '#7A5C46', 
+    lineHeight: 18 
   },
-  orangeBadge: {
-    backgroundColor: '#FF8C2B',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
+  orangeBadge: { 
+    backgroundColor: '#FF8C2B', 
+    width: 30, 
+    height: 30, 
+    borderRadius: 15, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  badgeText: { 
+    color: '#fff', 
+    fontWeight: 'bold', 
+    fontSize: 14 
+  },
+  emptyContainer: { 
+    paddingTop: 100, 
     alignItems: 'center',
+    opacity: 0.5
   },
-  badgeText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 12,
+  emptyText: { 
+    color: '#5D4037', 
+    fontSize: 16, 
+    marginTop: 10,
+    fontWeight: '500'
   },
 });
