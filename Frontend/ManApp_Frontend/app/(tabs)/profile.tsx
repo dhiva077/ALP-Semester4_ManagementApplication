@@ -1,44 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Image,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+
+import useProfileViewModel from '../../src/viewmodels/useProfileViewModel';
 
 export default function Profile() {
   const router = useRouter();
-  const [profileImage, setProfileImage] = useState<string | null>(null);
 
-  const pickImage = async () => {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Izin dibutuhkan',
-        'Izinkan akses galeri untuk mengganti foto profil.'
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
-    }
-  };
+  const { profileImage, pickImage } = useProfileViewModel();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -67,7 +44,10 @@ export default function Profile() {
           />
         </View>
 
-        <TouchableOpacity style={styles.editButton} onPress={pickImage}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={pickImage}
+        >
           <Ionicons name="pencil-outline" size={22} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -76,11 +56,21 @@ export default function Profile() {
 
       <TouchableOpacity style={styles.card}>
         <Text style={styles.cardText}>Riwayat Event Saya</Text>
-        <Ionicons name="chevron-forward" size={28} color="#6A3500" />
+
+        <Ionicons
+          name="chevron-forward"
+          size={28}
+          color="#6A3500"
+        />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton}>
-        <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+        <Ionicons
+          name="log-out-outline"
+          size={24}
+          color="#FF3B30"
+        />
+
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
     </SafeAreaView>
