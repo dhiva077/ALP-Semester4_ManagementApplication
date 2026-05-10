@@ -22,10 +22,10 @@ interface EventItem { id: number; title: string; location: string; time: string;
 interface EventData { [key: string]: EventItem[]; }
 
 const EVENT_STATUS_CONFIG: Record<string, string[]> = {
-  "Wisuda Santri TK/TPA Barokah": ["selesai", "selesai", "selesai", "selesai", "selesai", "belum"],
+  "Meeting Koordinasi": ["belum", "belum", "belum", "belum", "belum", "belum"],
+  "Wisuda Santri TK/TPA Barokah": ["selesai", "selesai", "selesai", "selesai", "selesai", "selesai"],
   "Pameran Buku by Gramedia": ["selesai", "revisi", "selesai", "belum", "selesai", "belum"],
   "Mayora Goes to Campus": ["selesai", "selesai", "revisi", "revisi", "belum", "belum"],
-  // ... (Event lainnya tetap sama)
 };
 
 const MOCK_EVENTS: EventData = {
@@ -54,6 +54,7 @@ export default function Dashboard() {
   const STORAGE_KEY = 'MANAPP_EVENTS';
   const CHECKLIST_KEY = 'CHECKLIST_DATA';
   const PROFILE_IMAGE_KEY = 'USER_PROFILE_IMAGE'; 
+  const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/bottts/png?seed=Ginger&backgroundColor=fef2db';
   const todayStr = getTodayStr();
 
   const getStatusColor = (statusArray: string[]) => {
@@ -67,6 +68,7 @@ export default function Dashboard() {
     return "#FF383C";
   };
 
+  // --- KOMBINASI LOGIKA: REFRESH DATA SAAT HALAMAN DIFOKUSKAN ---
   useFocusEffect(
     useCallback(() => {
       loadProfileData();
@@ -77,8 +79,12 @@ export default function Dashboard() {
   const loadProfileData = async () => {
     try {
       const savedImage = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
-      if (savedImage) setProfileImage(savedImage);
-    } catch (e) { console.error(e); }
+      // Jika ada di storage pakai itu, jika tidak pakai DEFAULT_AVATAR
+      setProfileImage(savedImage || DEFAULT_AVATAR);
+    } catch (e) { 
+      console.error(e);
+      setProfileImage(DEFAULT_AVATAR);
+    }
   };
 
   const loadEvents = async () => {
@@ -150,14 +156,17 @@ export default function Dashboard() {
       <View style={headerStyles.container}>
         <View style={headerStyles.profile}>
           <TouchableOpacity style={headerStyles.avatar} onPress={() => router.push('/profile')}>
-            {profileImage ? <Image source={{ uri: profileImage }} style={headerStyles.avatarImg} /> : <Ionicons name="person" size={28} color="#5C2C00" />}
+            <Image 
+              source={{ uri: profileImage || DEFAULT_AVATAR }} 
+              style={headerStyles.avatarImg} 
+            />
           </TouchableOpacity>
           <View>
             <Text style={headerStyles.greeting}>Hello,</Text>
             <Text style={headerStyles.name}>Rasya Dema</Text>
           </View>
         </View>
-        <TouchableOpacity style={headerStyles.notificationBtn} onPress={() => router.push('/(tabs)/notifikasi')}>
+        <TouchableOpacity style={headerStyles.notificationBtn} onPress={() => router.push('/notifikasi')}>
           <Ionicons name="notifications" size={24} color="#fff" />
           <View style={headerStyles.notifBadge} />
         </TouchableOpacity>
@@ -218,7 +227,7 @@ export default function Dashboard() {
       </View>
       <View style={mainStyles.divider} />
       
-      {/* EVENT LIST (SUDAH DISESUAIKAN: TEKS KIRI, DOT KANAN) */}
+      {/* EVENT LIST */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={mainStyles.listContent}>
         {events[selectedDate] ? events[selectedDate].map((event) => (
           <TouchableOpacity 
@@ -226,14 +235,11 @@ export default function Dashboard() {
             style={eventStyles.card} 
             onPress={() => router.push({ pathname: '/checklist', params: { eventName: event.title, eventDate: selectedDate, source: 'dashboard' } })}
           >
-            {/* Teks di Kiri */}
             <View style={eventStyles.content}>
               <Text style={eventStyles.title}>{event.title}</Text>
               <Text style={eventStyles.subText}>{event.location}</Text>
               <Text style={eventStyles.subText}>Pukul {event.time}</Text>
             </View>
-
-            {/* Lampu Indikator di Kanan */}
             <View style={[eventStyles.dot, { backgroundColor: event.color }]} />
           </TouchableOpacity>
         )) : <Text style={mainStyles.emptyText}>Tidak ada event.</Text>}
@@ -248,7 +254,6 @@ export default function Dashboard() {
   );
 }
 
-// --- STYLES (DENGAN PERUBAHAN POSISI DOT) ---
 const pickerStyles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modal: { width: '85%', height: 420, backgroundColor: '#FFF', borderRadius: 25, padding: 20, elevation: 10 },

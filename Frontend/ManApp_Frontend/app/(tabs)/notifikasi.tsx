@@ -12,7 +12,6 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 
-// Keys sesuai dengan yang digunakan pada fitur Kalender dan Penyimpanan
 const STORAGE_KEY = 'MANAPP_EVENTS';
 const CHECKLIST_KEY = 'CHECKLIST_DATA';
 const DEFAULT_STATUS = ['belum', 'belum', 'belum', 'belum', 'belum', 'belum'];
@@ -29,7 +28,6 @@ export default function Notifikasi() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
-  // Fungsi untuk memetakan data dari Kalender & status Penyimpanan
   const loadNotifications = async () => {
     try {
       const savedEvents = await AsyncStorage.getItem(STORAGE_KEY);
@@ -40,18 +38,14 @@ export default function Notifikasi() {
 
       const list: NotificationItem[] = [];
 
-      // Iterasi setiap tanggal di kalender
       Object.entries(events).forEach(([date, items]) => {
         const eventList = items as any[];
         
         eventList.forEach((item) => {
-          // Ambil status checklist dari penyimpanan berdasarkan judul event
           const statusArray = checklistData[item.title] || DEFAULT_STATUS;
           
-          // Hitung berapa banyak file yang belum 'selesai'
           const incompleteCount = statusArray.filter((status: string) => status !== 'selesai').length;
 
-          // Hanya masukkan ke notifikasi jika masih ada file yang belum lengkap
           if (incompleteCount > 0) {
             list.push({
               id: item.id,
@@ -64,14 +58,12 @@ export default function Notifikasi() {
         });
       });
 
-      // Urutkan berdasarkan tanggal terdekat
       setNotifications(list.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()));
     } catch (error) {
       console.error("Gagal memuat notifikasi:", error);
     }
   };
 
-  // Reload data setiap kali halaman fokus
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
@@ -80,7 +72,6 @@ export default function Notifikasi() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER SESUAI GAMBAR */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton} 
@@ -110,12 +101,11 @@ export default function Notifikasi() {
                 },
               })}
             >
-              {/* ICON FOLDER COKELAT SESUAI GAMBAR */}
+
               <View style={styles.iconContainer}>
                 <Ionicons name="folder" size={38} color="#5D4037" />
               </View>
 
-              {/* TEKS KONTEN */}
               <View style={styles.textContainer}>
                 <Text style={styles.notifTitle}>{item.eventName}</Text>
                 <Text style={styles.notifDesc} numberOfLines={2}>
@@ -123,7 +113,6 @@ export default function Notifikasi() {
                 </Text>
               </View>
 
-              {/* BADGE ORANYE SESUAI GAMBAR */}
               <View style={styles.orangeBadge}>
                 <Text style={styles.badgeText}>{item.incompleteCount}</Text>
               </View>
@@ -143,7 +132,7 @@ export default function Notifikasi() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#F2E3C9' // Warna krem sesuai gambar
+    backgroundColor: '#F2E3C9'
   },
   header: { 
     flexDirection: 'row', 
@@ -170,7 +159,7 @@ const styles = StyleSheet.create({
   spacer: { width: 45 },
   scrollContent: { 
     paddingHorizontal: 20, 
-    paddingBottom: 100 // Ruang untuk TabBar
+    paddingBottom: 100 
   },
   notifCard: { 
     backgroundColor: '#FFFBF2', 

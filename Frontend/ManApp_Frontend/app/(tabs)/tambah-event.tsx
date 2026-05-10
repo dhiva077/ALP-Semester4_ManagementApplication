@@ -146,7 +146,6 @@ export default function TambahEvent() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Tombol Back Header juga arahkan ke Dashboard */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace('/(tabs)/dashboard')} style={styles.backButton}>
           <Ionicons name="chevron-back" size={28} color="#FFF" />
@@ -218,13 +217,14 @@ export default function TambahEvent() {
           <Text style={styles.uploadText}>Tambah Berkas</Text>
         </TouchableOpacity>
 
+        <Text style={styles.fileCriteria}>Kriteria file: PKS_NamaEvent, Invoice_NamaEvent</Text>
+
         <TouchableOpacity style={styles.btnSimpan} onPress={validateAndSave}>
           <Text style={styles.btnText}>Simpan Event</Text>
         </TouchableOpacity>
       </ScrollView>
 
       {/* --- MODALS AREA --- */}
-      
       <Modal visible={showDateModal} transparent animationType="fade" onRequestClose={() => setShowDateModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.calendarCard}>
@@ -260,7 +260,6 @@ export default function TambahEvent() {
             </TouchableOpacity>
           </View>
 
-          {/* PICKER MODERN */}
           <Modal visible={showPicker} transparent animationType="slide" onRequestClose={() => setShowPicker(false)}>
             <View style={styles.pickerOverlay}>
               <View style={styles.modernPickerCard}>
@@ -351,7 +350,10 @@ const styles = StyleSheet.create({
   fileItemName: { flex: 1, marginLeft: 10, fontSize: 13, color: '#4E342E', fontWeight: '600' },
   uploadArea: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF', borderRadius: 12, height: 50, borderWidth: 1, borderColor: '#8D6E63', borderStyle: 'dashed', marginTop: 5 },
   uploadText: { marginLeft: 10, color: '#8D6E63', fontWeight: 'bold' },
-  btnSimpan: { backgroundColor: '#FF8C00', height: 55, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginTop: 25, elevation: 5 },
+  
+  fileCriteria: { color: '#5C2C00', fontSize: 11, marginTop: 8, marginBottom: 20, textAlign: 'center' },
+  
+  btnSimpan: { backgroundColor: '#FF8C00', height: 55, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginTop: 10, elevation: 5 },
   btnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   calendarCard: { width: '90%', backgroundColor: '#fff', borderRadius: 25, overflow: 'hidden', elevation: 20 },

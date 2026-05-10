@@ -54,10 +54,9 @@ export default function NotifikasiDetail() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        {/* FIX: Tombol Back sekarang mengarah ke halaman Dashboard */}
         <TouchableOpacity 
           style={styles.backButton} 
-          onPress={() => router.push('/(tabs)/dashboard')}
+          onPress={() => router.push('/(tabs)/notifikasi')}
         >
           <Ionicons name="chevron-back" size={28} color="#fff" />
         </TouchableOpacity>
