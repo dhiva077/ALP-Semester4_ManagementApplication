@@ -71,7 +71,6 @@ export default function EditEvent() {
         const foundEvent = eventList.find((item: any) => item.title === initialEventName);
 
         if (foundEvent) {
-          // LOGIKA NAMA PIC RANDOM: Jika picName kosong, pilih Dylon atau Fathir
           if (!foundEvent.picName) {
             const randomPIC = Math.random() < 0.5 ? 'Dylon' : 'Fathir';
             setPicName(randomPIC);
@@ -181,8 +180,6 @@ export default function EditEvent() {
         )}
 
         <Text style={styles.sectionLabel}>Informasi Utama</Text>
-
-        {/* 1. Nama PIC (Sudah diisi random Dylon/Fathir) */}
         <View style={[styles.inputContainer, isLocked && styles.disabledInput]}>
           <Ionicons name="people-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
           <TextInput
@@ -194,7 +191,6 @@ export default function EditEvent() {
           />
         </View>
 
-        {/* 2. Nama Event */}
         <View style={[styles.inputContainer, isLocked && styles.disabledInput]}>
           <Ionicons name="person-add-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
           <TextInput
@@ -206,7 +202,6 @@ export default function EditEvent() {
           />
         </View>
 
-        {/* 3. TANGGAL EVENT (Bisa diedit jika belum H-7) */}
         <View style={[styles.inputContainer, isLocked && styles.disabledInput]}>
           <Ionicons name="calendar-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
           <TextInput
@@ -219,7 +214,6 @@ export default function EditEvent() {
           {isLocked && <Ionicons name="lock-closed" size={16} color="#AAA" />}
         </View>
 
-        {/* 4. Lokasi Event */}
         <View style={[styles.inputContainer, isLocked && styles.disabledInput]}>
           <Ionicons name="location-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
           <TextInput
@@ -231,7 +225,6 @@ export default function EditEvent() {
           />
         </View>
 
-        {/* 5. Baris Waktu */}
         <View style={styles.timeRow}>
           <View style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}>
             <Ionicons name="time-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
