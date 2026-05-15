@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,6 +15,8 @@ class File extends Model
      * @var string
      */
     protected $table = 'files';
+    /** @use HasFactory */
+    use HasFactory;
 
     /**
      * The "booted" method of the model.
