@@ -278,7 +278,7 @@ export default function EditEvent() {
           <Text style={styles.uploadText}>Tambah Berkas</Text>
         </TouchableOpacity>
 
-        <Text style={styles.fileCriteria}>Kriteria file: PKS_NamaEvent, Invoice_NamaEvent</Text>
+        {/* Baris teks kriteria file di sini telah dihilangkan */}
 
         <TouchableOpacity style={styles.btnSimpan} onPress={validateAndSave} activeOpacity={0.8}>
           <Text style={styles.btnText}>
@@ -291,31 +291,197 @@ export default function EditEvent() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FEF2DB' },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 10, marginBottom: 10 },
-  backButton: { backgroundColor: '#FF9800', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 4 },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: 'bold', color: '#4E342E', marginRight: 40 },
-  scrollContent: { paddingHorizontal: 25, paddingBottom: 40 },
-  sectionLabel: { fontSize: 14, fontWeight: 'bold', color: '#8D6E63', marginBottom: 10, marginTop: 10 },
-  lockBanner: { flexDirection: 'row', backgroundColor: '#E8F5E9', padding: 12, borderRadius: 10, marginBottom: 15, alignItems: 'center' },
-  lockText: { flex: 1, marginLeft: 8, fontSize: 11, color: '#2E7D32', fontWeight: '500' },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 12, paddingHorizontal: 15, height: 50, marginBottom: 12, elevation: 2 },
-  inputContainerMultiline: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 12, paddingHorizontal: 15, minHeight: 100, marginBottom: 12, elevation: 2, paddingTop: 10 },
-  disabledInput: { backgroundColor: '#F5F5F5', elevation: 0, borderWidth: 1, borderColor: '#EEE' },
-  textDisabled: { color: '#AAA' },
-  icon: { marginRight: 10 },
-  iconMultiline: { marginRight: 10, marginTop: 5 },
-  input: { flex: 1, fontSize: 14, color: '#4E342E' },
-  boldText: { fontWeight: 'bold' },
-  descriptionInput: { flex: 1, textAlignVertical: 'top' },
-  fileItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 12, borderRadius: 12, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: '#FF8C00', elevation: 2 },
-  fileItemName: { flex: 1, marginLeft: 10, fontSize: 13, color: '#4E342E', fontWeight: '600' },
-  uploadArea: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF', borderRadius: 12, height: 50, borderWidth: 1, borderColor: '#8D6E63', borderStyle: 'dashed', marginTop: 5 },
-  uploadText: { marginLeft: 10, color: '#8D6E63', fontWeight: 'bold' },
-  fileCriteria: { color: '#5C2C00', fontSize: 11, marginTop: 8, marginBottom: 20, textAlign: 'center' },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dash: { fontSize: 20, fontWeight: 'bold', color: '#4E342E', marginBottom: 10 },
-  btnSimpan: { backgroundColor: '#FF8C00', height: 55, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginTop: 10, elevation: 5 },
-  btnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  container: {
+    flex: 1,
+    backgroundColor: '#FEF2DB',
+  },
+
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FF9800',
+    elevation: 4,
+  },
+
+  headerTitle: {
+    flex: 1,
+    marginRight: 40,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4E342E',
+  },
+
+  scrollContent: {
+    paddingHorizontal: 25,
+    paddingBottom: 40,
+  },
+
+  sectionLabel: {
+    marginTop: 10,
+    marginBottom: 10,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#8D6E63',
+  },
+
+  lockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 15,
+    borderRadius: 10,
+    backgroundColor: '#E8F5E9',
+  },
+
+  lockText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#2E7D32',
+  },
+
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 50,
+    paddingHorizontal: 15,
+    marginBottom: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    elevation: 2,
+  },
+
+  inputContainerMultiline: {
+    flexDirection: 'row',
+    minHeight: 100,
+    paddingTop: 10,
+    paddingHorizontal: 15,
+    marginBottom: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    elevation: 2,
+  },
+
+  disabledInput: {
+    backgroundColor: '#F5F5F5',
+    elevation: 0,
+    borderWidth: 1,
+    borderColor: '#EEE',
+  },
+
+  textDisabled: {
+    color: '#AAA',
+  },
+
+  icon: {
+    marginRight: 10,
+  },
+
+  iconMultiline: {
+    marginTop: 5,
+    marginRight: 10,
+  },
+
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: '#4E342E',
+  },
+
+  boldText: {
+    fontWeight: 'bold',
+  },
+
+  descriptionInput: {
+    flex: 1,
+    textAlignVertical: 'top',
+  },
+
+  fileItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF8C00',
+    elevation: 2,
+  },
+
+  fileItemName: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4E342E',
+  },
+
+  uploadArea: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 50,
+    marginTop: 5,
+    marginBottom: 20,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#8D6E63',
+    borderStyle: 'dashed',
+  },
+
+  uploadText: {
+    marginLeft: 10,
+    color: '#8D6E63',
+    fontWeight: 'bold',
+  },
+
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  dash: {
+    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4E342E',
+  },
+
+  btnSimpan: {
+    height: 55,
+    marginTop: 10,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FF8C00',
+    elevation: 5,
+  },
+
+  btnText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
 });

@@ -98,18 +98,95 @@ export default function NotifikasiDetail() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FEF2DB' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 18 },
-  backButton: { backgroundColor: '#FF8C2B', width: 45, height: 45, borderRadius: 22.5, justifyContent: 'center', alignItems: 'center', elevation: 4 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#5D4037' },
-  spacer: { width: 45 },
-  content: { paddingHorizontal: 20, paddingBottom: 40 },
-  card: { backgroundColor: '#FFFDF0', borderRadius: 20, padding: 24, elevation: 2, marginTop: 20 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#5D4037', marginBottom: 18 },
-  subtitle: { fontSize: 13, color: '#8D6E63', marginTop: 12, marginBottom: 4, textTransform: 'uppercase' },
-  detailText: { fontSize: 16, color: '#5D4037', lineHeight: 24 },
-  actionButton: { marginTop: 30, backgroundColor: '#FF8C2B', borderRadius: 14, justifyContent: 'center', alignItems: 'center', paddingVertical: 14 },
-  actionText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  emptyState: { marginTop: 80, alignItems: 'center' },
-  emptyText: { color: '#5D4037', textAlign: 'center' },
+  container: {
+    flex: 1,
+    backgroundColor: '#FEF2DB',
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
+
+  backButton: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#FF8C2B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+  },
+
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#5D4037',
+  },
+
+  spacer: {
+    width: 45,
+  },
+
+  content: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+
+  card: {
+    marginTop: 20,
+    padding: 24,
+    borderRadius: 20,
+    backgroundColor: '#FFFDF0',
+    elevation: 2,
+  },
+
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#5D4037',
+    marginBottom: 18,
+  },
+
+  subtitle: {
+    marginTop: 12,
+    marginBottom: 4,
+    fontSize: 13,
+    color: '#8D6E63',
+    textTransform: 'uppercase',
+  },
+
+  detailText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#5D4037',
+  },
+
+  actionButton: {
+    marginTop: 30,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#FF8C2B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  actionText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+
+  emptyState: {
+    marginTop: 80,
+    alignItems: 'center',
+  },
+
+  emptyText: {
+    color: '#5D4037',
+    textAlign: 'center',
+  },
 });

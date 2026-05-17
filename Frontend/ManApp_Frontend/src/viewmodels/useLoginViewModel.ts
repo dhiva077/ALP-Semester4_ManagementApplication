@@ -3,6 +3,25 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
+const USER_DATA_MAP: Record<string, { name: string; role: string }> = {
+  'wulan.purnamasari@ciputra.ac.id': { name: 'Wulan Purnamasari', role: 'manager' },
+  'amuh0003@student.ciputra.ac.id': { name: 'Fathir', role: 'pic' },
+  'dgongxi01@student.ciputra.ac.id': { name: 'Dylon', role: 'pic' },
+};
+
+const ALLOWED_DOMAINS = ['@ciputra.ac.id', '@staffpm.ciputra.ac.id', '@student.ciputra.ac.id'];
+
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const getDefaultNameFromEmail = (email: string) => {
+  const localPart = email.split('@')[0];
+  return localPart
+    .split(/[._]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ') || 'User';
+};
+
 export default function useLoginViewModel() {
   const router = useRouter();
 
@@ -16,24 +35,38 @@ export default function useLoginViewModel() {
   };
 
   const handleLogin = async () => {
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!normalizedEmail) {
+      Alert.alert('Login Ditolak', 'Email tidak boleh kosong.');
+      return;
+    }
+
+    if (!ALLOWED_DOMAINS.some((domain) => normalizedEmail.endsWith(domain))) {
+      Alert.alert('Login Ditolak', 'Gunakan email UC yang valid.');
+      return;
+    }
+
     try {
       setIsLoading(true);
 
+      const mappedUser = USER_DATA_MAP[normalizedEmail];
       const userData = {
-        name: 'Frontend Demo User',
-        email: 'demo@ciputra.ac.id',
+        name: mappedUser?.name ?? getDefaultNameFromEmail(normalizedEmail),
+        email: normalizedEmail,
+        role: mappedUser?.role ?? 'pic',
       };
 
       await AsyncStorage.multiSet([
         ['isLoggedIn', 'true'],
-        ['authProvider', 'frontend-only'],
+        ['authProvider', 'manual'],
         ['user', JSON.stringify(userData)],
       ]);
 
       router.replace('/(tabs)/dashboard');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Login gagal';
-      console.log('Login error:', errorMsg); // Log untuk debugging
+      console.log('Login error:', errorMsg);
       Alert.alert('Login Gagal', errorMsg);
     } finally {
       setIsLoading(false);

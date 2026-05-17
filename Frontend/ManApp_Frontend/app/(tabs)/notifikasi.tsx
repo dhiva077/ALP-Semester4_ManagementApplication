@@ -130,90 +130,110 @@ export default function Notifikasi() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#F2E3C9'
+  container: {
+    flex: 1,
+    backgroundColor: '#F2E3C9',
   },
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 20, 
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
     paddingVertical: 15,
-    marginTop: 10
+    marginTop: 10,
   },
-  backButton: { 
-    backgroundColor: '#FF8C2B', 
-    width: 45, 
-    height: 45, 
-    borderRadius: 22.5, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    elevation: 4 
+
+  backButton: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#FF8C2B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
   },
-  headerTitle: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    color: '#5D4037' 
+
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#5D4037',
   },
-  spacer: { width: 45 },
-  scrollContent: { 
-    paddingHorizontal: 20, 
-    paddingBottom: 100 
+
+  spacer: {
+    width: 45,
   },
-  notifCard: { 
-    backgroundColor: '#FFFBF2', 
-    borderRadius: 20, 
-    padding: 18, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 15, 
+
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+
+  notifCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 18,
+    marginBottom: 15,
+    borderRadius: 20,
+    backgroundColor: '#FFFBF2',
     elevation: 3,
+
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  iconContainer: { 
-    marginRight: 15 
+
+  iconContainer: {
+    marginRight: 15,
   },
-  textContainer: { 
-    flex: 1, 
-    marginRight: 10 
+
+  textContainer: {
+    flex: 1,
+    marginRight: 10,
   },
-  notifTitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
+
+  notifTitle: {
+    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#5D4037',
-    marginBottom: 4
   },
-  notifDesc: { 
-    fontSize: 12, 
-    color: '#7A5C46', 
-    lineHeight: 18 
+
+  notifDesc: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#7A5C46',
   },
-  orangeBadge: { 
-    backgroundColor: '#FF8C2B', 
-    width: 30, 
-    height: 30, 
-    borderRadius: 15, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  badgeText: { 
-    color: '#fff', 
-    fontWeight: 'bold', 
-    fontSize: 14 
-  },
-  emptyContainer: { 
-    paddingTop: 100, 
+
+  orangeBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#FF8C2B',
+    justifyContent: 'center',
     alignItems: 'center',
-    opacity: 0.5
   },
-  emptyText: { 
-    color: '#5D4037', 
-    fontSize: 16, 
+
+  badgeText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+
+  emptyContainer: {
+    paddingTop: 100,
+    alignItems: 'center',
+    opacity: 0.5,
+  },
+
+  emptyText: {
     marginTop: 10,
-    fontWeight: '500'
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#5D4037',
   },
 });

@@ -12,6 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { EVENT_DATA, normalizeName } from '../../src/data/events';
 import { useRouter } from 'expo-router';
 
 // --- DATA PEMBANTU ---
@@ -47,6 +48,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayStr());
   const [events, setEvents] = useState<EventData>(MOCK_EVENTS);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string; role?: string } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [tempMonth, setTempMonth] = useState(currentDate.getMonth());
   const [tempYear, setTempYear] = useState(currentDate.getFullYear());
@@ -68,7 +70,7 @@ export default function Dashboard() {
     return "#FF383C";
   };
 
-  // --- KOMBINASI LOGIKA: REFRESH DATA SAAT HALAMAN DIFOKUSKAN ---
+  // --- REFRESH DATA SAAT HALAMAN DIFOKUSKAN ---
   useFocusEffect(
     useCallback(() => {
       loadProfileData();
@@ -79,11 +81,13 @@ export default function Dashboard() {
   const loadProfileData = async () => {
     try {
       const savedImage = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
-      // Jika ada di storage pakai itu, jika tidak pakai DEFAULT_AVATAR
+      const savedUser = await AsyncStorage.getItem('user');
       setProfileImage(savedImage || DEFAULT_AVATAR);
-    } catch (e) { 
+      setCurrentUser(savedUser ? JSON.parse(savedUser) : null);
+    } catch (e) {
       console.error(e);
       setProfileImage(DEFAULT_AVATAR);
+      setCurrentUser(null);
     }
   };
 
@@ -163,7 +167,7 @@ export default function Dashboard() {
           </TouchableOpacity>
           <View>
             <Text style={headerStyles.greeting}>Hello,</Text>
-            <Text style={headerStyles.name}>Rasya Dema</Text>
+            <Text style={headerStyles.name}>{currentUser?.name ?? 'Guest'}</Text>
           </View>
         </View>
         <TouchableOpacity style={headerStyles.notificationBtn} onPress={() => router.push('/notifikasi')}>
@@ -233,7 +237,10 @@ export default function Dashboard() {
           <TouchableOpacity 
             key={`${selectedDate}-${event.id}`} 
             style={eventStyles.card} 
-            onPress={() => router.push({ pathname: '/checklist', params: { eventName: event.title, eventDate: selectedDate, source: 'dashboard' } })}
+            onPress={() => {
+              const matched = EVENT_DATA.find(e => normalizeName(e.name) === normalizeName(event.title));
+              router.push({ pathname: '/checklist', params: { eventName: event.title, eventDate: selectedDate, source: 'dashboard', location: event.location || matched?.location, pic: matched?.pic } });
+            }}
           >
             <View style={eventStyles.content}>
               <Text style={eventStyles.title}>{event.title}</Text>
@@ -255,103 +262,374 @@ export default function Dashboard() {
 }
 
 const pickerStyles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modal: { width: '85%', height: 420, backgroundColor: '#FFF', borderRadius: 25, padding: 20, elevation: 10 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#5C2C00', textAlign: 'center', marginBottom: 20 },
-  listsContainer: { flex: 1, flexDirection: 'row', gap: 12 },
-  scrollCol: { flex: 1, borderWidth: 1, borderColor: '#F0F0F0', borderRadius: 15 },
-  item: { padding: 15, alignItems: 'center', borderRadius: 10 },
-  activeItem: { backgroundColor: '#FF8F29' },
-  itemText: { color: '#5C2C00', fontSize: 14 },
-  activeText: { color: '#FFF', fontWeight: 'bold' },
-  buttonRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
-  cancelBtn: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#5C2C00', alignItems: 'center' },
-  cancelBtnText: { color: '#5C2C00', fontWeight: 'bold' },
-  confirmBtn: { flex: 1, padding: 14, backgroundColor: '#5C2C00', borderRadius: 12, alignItems: 'center' },
-  confirmBtnText: { color: '#FFF', fontWeight: 'bold' },
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+
+  modal: {
+    width: '85%',
+    height: 420,
+    padding: 20,
+    borderRadius: 25,
+    backgroundColor: '#FFF',
+    elevation: 10,
+  },
+
+  modalTitle: {
+    marginBottom: 20,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+    textAlign: 'center',
+  },
+
+  listsContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  scrollCol: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    borderRadius: 15,
+  },
+
+  item: {
+    padding: 15,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+
+  activeItem: {
+    backgroundColor: '#FF8F29',
+  },
+
+  itemText: {
+    fontSize: 14,
+    color: '#5C2C00',
+  },
+
+  activeText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+
+  cancelBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#5C2C00',
+    alignItems: 'center',
+  },
+
+  cancelBtnText: {
+    color: '#5C2C00',
+    fontWeight: 'bold',
+  },
+
+  confirmBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#5C2C00',
+  },
+
+  confirmBtnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
 });
 
 const mainStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FEF2DB' },
-  listContent: { paddingHorizontal: 0, paddingBottom: 170 },
-  divider: { height: 1, backgroundColor: '#5C2C00', margin: 20, opacity: 0.3 },
-  emptyText: { textAlign: 'center', color: '#5C2C00', marginTop: 10, opacity: 0.6 },
+  container: {
+    flex: 1,
+    backgroundColor: '#FEF2DB',
+  },
+
+  listContent: {
+    paddingHorizontal: 0,
+    paddingBottom: 170,
+  },
+
+  divider: {
+    height: 1,
+    margin: 20,
+    backgroundColor: '#5C2C00',
+    opacity: 0.3,
+  },
+
+  emptyText: {
+    marginTop: 10,
+    textAlign: 'center',
+    color: '#5C2C00',
+    opacity: 0.6,
+  },
 });
 
 const headerStyles = StyleSheet.create({
-  container: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 30, marginTop: 10, alignItems: 'center' },
-  profile: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#5C2C00', overflow: 'hidden' },
-  avatarImg: { width: '100%', height: '100%' },
-  greeting: { fontSize: 14, color: '#5C2C00' },
-  name: { fontSize: 18, fontWeight: 'bold', color: '#5C2C00' },
-  notificationBtn: { backgroundColor: '#5C2C00', width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
-  notifBadge: { width: 8, height: 8, backgroundColor: 'red', borderRadius: 4, position: 'absolute', top: 8, right: 8, borderWidth: 1, borderColor: '#5C2C00' },
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    marginTop: 10,
+  },
+
+  profile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#5C2C00',
+    overflow: 'hidden',
+  },
+
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+
+  greeting: {
+    fontSize: 14,
+    color: '#5C2C00',
+  },
+
+  name: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+  },
+
+  notificationBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#5C2C00',
+  },
+
+  notifBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'red',
+    borderWidth: 1,
+    borderColor: '#5C2C00',
+  },
 });
 
 const calendarStyles = StyleSheet.create({
-  card: { margin: 25, backgroundColor: '#fff', borderRadius: 25, overflow: 'hidden', elevation: 4 },
-  header: { backgroundColor: '#FF8F29', padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  titleBtn: { flexDirection: 'row', alignItems: 'center' },
-  title: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  body: { padding: 15 },
-  weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  dayLabel: { width: '14%', textAlign: 'center', color: '#5C2C00', fontWeight: '600' },
-  dateGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  dateCell: { width: '14%', alignItems: 'center', height: 45, justifyContent: 'center' },
-  dateText: { color: '#5C2C00', fontSize: 14 },
-  selectedText: { color: '#FF8C00', fontWeight: 'bold' },
-  orangeIndicator: { width: 18, height: 3, backgroundColor: '#FF8C00', marginTop: 5, borderRadius: 2 },
-  bookedIndicator: { width: 18, height: 3, backgroundColor: '#5C2C00', marginTop: 2, borderRadius: 2 },
+  card: {
+    margin: 25,
+    borderRadius: 25,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    elevation: 4,
+  },
+
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#FF8F29',
+  },
+
+  titleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+
+  body: {
+    padding: 15,
+  },
+
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  dayLabel: {
+    width: '14%',
+    textAlign: 'center',
+    color: '#5C2C00',
+    fontWeight: '600',
+  },
+
+  dateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  dateCell: {
+    width: '14%',
+    height: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  dateText: {
+    fontSize: 14,
+    color: '#5C2C00',
+  },
+
+  selectedText: {
+    color: '#FF8C00',
+    fontWeight: 'bold',
+  },
+
+  orangeIndicator: {
+    width: 18,
+    height: 3,
+    marginTop: 5,
+    borderRadius: 2,
+    backgroundColor: '#FF8C00',
+  },
+
+  bookedIndicator: {
+    width: 18,
+    height: 3,
+    marginTop: 2,
+    borderRadius: 2,
+    backgroundColor: '#5C2C00',
+  },
 });
 
 const legendStyles = StyleSheet.create({
-  pill: { flexDirection: 'row', backgroundColor: '#FFF', marginTop: 1, marginHorizontal: 35, padding: 12, borderRadius: 30, justifyContent: 'center', gap: 15, elevation: 2 },
-  title: { fontSize: 12, fontWeight: 'bold', color: '#5C2C00' },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  line: { width: 15, height: 4, borderRadius: 2 },
-  label: { fontSize: 11, color: '#5C2C00' },
+  pill: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 15,
+    marginTop: 1,
+    marginHorizontal: 35,
+    padding: 12,
+    borderRadius: 30,
+    backgroundColor: '#FFF',
+    elevation: 2,
+  },
+
+  title: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+  },
+
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+
+  line: {
+    width: 15,
+    height: 4,
+    borderRadius: 2,
+  },
+
+  label: {
+    fontSize: 11,
+    color: '#5C2C00',
+  },
 });
 
 const eventStyles = StyleSheet.create({
-  card: { 
-    backgroundColor: '#FFFDF0', 
-    marginHorizontal: 20, 
-    padding: 20, 
-    borderRadius: 25, 
-    marginBottom: 12, 
-    flexDirection: 'row', 
-    alignItems: 'center',
+  card: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    borderWidth: 1, 
-    borderColor: '#FFFDF0' 
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 20,
+    borderRadius: 25,
+    backgroundColor: '#FFFDF0',
+    borderWidth: 1,
+    borderColor: '#FFFDF0',
   },
-  content: { 
+
+  content: {
     flex: 1,
     alignItems: 'center',
   },
-  title: { 
-    fontWeight: 'bold', 
-    color: '#5C2C00', 
-    marginBottom: 5, 
-    fontSize: 16, 
-    textAlign: 'left' 
+
+  title: {
+    marginBottom: 5,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+    textAlign: 'left',
   },
-  subText: { 
-    fontSize: 12, 
-    color: '#5C2C00', 
-    textAlign: 'left' 
+
+  subText: {
+    fontSize: 12,
+    color: '#5C2C00',
+    textAlign: 'left',
   },
-  dot: { 
-    width: 20, 
-    height: 20, 
-    borderRadius: 10, 
-    elevation: 2,
+
+  dot: {
+    width: 20,
+    height: 20,
     marginLeft: 15,
+    borderRadius: 10,
+    elevation: 2,
   },
 });
 
 const fabStyles = StyleSheet.create({
-  button: { position: 'absolute', bottom: 110, right: 25, backgroundColor: '#5C2C00', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 8 },
-  plusIcon: { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#FFF', width: 16, height: 16, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+  button: {
+    position: 'absolute',
+    right: 25,
+    bottom: 110,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#5C2C00',
+    elevation: 8,
+  },
+
+  plusIcon: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
 });
