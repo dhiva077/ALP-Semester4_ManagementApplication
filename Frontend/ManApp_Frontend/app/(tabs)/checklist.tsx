@@ -12,6 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { EVENT_DATA, normalizeName } from '../../src/data/events';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const BASE_CHECKLIST = [
@@ -39,6 +40,7 @@ export default function Checklist() {
   const [checklistMap, setChecklistMap] = useState<Record<string, string[]>>({});
 
   const currentEventName = typeof eventName === 'string' ? eventName : "Detail Event";
+  const currentEventDate = typeof eventDate === 'string' ? eventDate : "";
   const sourceFrom = typeof source === 'string' ? source : 'dashboard';
   const CHECKLIST_KEY = 'CHECKLIST_DATA';
 
@@ -117,7 +119,7 @@ export default function Checklist() {
             onPress={() => {
               if (sourceFrom === 'penyimpanan') router.push('/(tabs)/penyimpanan');
               else if (sourceFrom === 'notifikasi') {
-                router.push({ pathname: '/(tabs)/notifikasi-detail', params: { eventName: currentEventName, eventDate } });
+                router.push({ pathname: '/(tabs)/notifikasi-detail', params: { eventName: currentEventName, eventDate: currentEventDate } });
               } else router.push('/(tabs)/dashboard');
             }}
             style={styles.backButton}
@@ -139,7 +141,7 @@ export default function Checklist() {
               onChangeText={setSearchQuery}
             />
           </View>
-          <TouchableOpacity style={styles.editButton} onPress={() => router.push({ pathname: '/(tabs)/edit-event', params: { eventName: currentEventName, eventDate, source: 'checklist' } })}>
+          <TouchableOpacity style={styles.editButton} onPress={() => router.push({ pathname: '/(tabs)/edit-event', params: { eventName: currentEventName, eventDate: currentEventDate, source: 'checklist' } })}>
             <MaterialCommunityIcons name="pencil" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
@@ -150,7 +152,6 @@ export default function Checklist() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* LOGIKA PENGECEKAN DATA KOSONG */}
         {filteredChecklist.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="file-search-outline" size={80} color="#D2B48C" />
@@ -169,14 +170,31 @@ export default function Checklist() {
                 style={styles.checklistCard}
                 onPress={() => {
                   const path = currentStatus === 'belum' ? '/(tabs)/input-file' : '/(tabs)/file-detail';
+                  
+                  // ALGORITMA PENCOCOKAN MULTI-LAYER (Nama -> Tanggal -> Substring)
+                  let matched = EVENT_DATA.find(e => normalizeName(e.name) === normalizeName(currentEventName));
+                  
+                  if (!matched && currentEventDate) {
+                    matched = EVENT_DATA.find(e => e.date === currentEventDate);
+                  }
+                  
+                  if (!matched && currentEventName !== "Detail Event") {
+                    matched = EVENT_DATA.find(e => 
+                      normalizeName(e.name).includes(normalizeName(currentEventName)) ||
+                      normalizeName(currentEventName).includes(normalizeName(e.name))
+                    );
+                  }
+                  
                   router.push({
                     pathname: path,
                     params: {
                       title: item.title,
-                      eventName: currentEventName,
-                      eventDate: eventDate,
+                      eventName: matched ? matched.name : currentEventName,
+                      eventDate: matched ? matched.date : currentEventDate,
                       checklistId: item.id,
-                      source: sourceFrom
+                      source: sourceFrom,
+                      location: matched ? matched.location : (params.location && params.location !== 'Lokasi tidak ditemukan' ? params.location : 'Dian Auditorium'),
+                      pic: matched ? matched.pic : (params.pic && params.pic !== 'Petugas' ? params.pic : 'Fathir'),
                     }
                   });
                 }}
@@ -188,7 +206,6 @@ export default function Checklist() {
           })
         )}
 
-        {/* LEGEND hanya tampil jika ada data atau search box kosong */}
         {filteredChecklist.length > 0 && (
           <View style={styles.legendContainer}>
             <Text style={styles.legendHeader}>Keterangan:</Text>
@@ -205,29 +222,180 @@ export default function Checklist() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FEF2DB' },
-  fixedHeader: { paddingHorizontal: 25, backgroundColor: '#FEF2DB' },
-  header: { flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 35, justifyContent: 'center' },
-  backButton: { backgroundColor: '#FF8F29', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 4, position: 'absolute', left: 0 },
-  titleContainer: { maxWidth: '70%' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#5C2C00', textAlign: 'center' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-  searchContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 20, paddingHorizontal: 15, height: 45, borderWidth: 1, borderColor: '#fff' },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 14, color: '#5C2C00' },
-  editButton: { backgroundColor: '#5C2C00', width: 45, height: 45, borderRadius: 22.5, justifyContent: 'center', alignItems: 'center', elevation: 3 },
-  orangeBanner: { backgroundColor: '#FF8F29', paddingVertical: 16, borderRadius: 15, marginBottom: 10, elevation: 3 },
-  bannerText: { color: '#FFFDF0', fontWeight: 'bold', fontSize: 16, textAlign: 'center' },
-  scrollContent: { paddingHorizontal: 25, paddingTop: 10, paddingBottom: 40 },
-  checklistCard: { backgroundColor: '#FFFDF0', borderRadius: 18, paddingVertical: 18, paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, elevation: 2 },
-  checklistTitle: { fontSize: 15, fontWeight: 'bold', color: '#5C2C00', flex: 1 },
-  statusCircle: { width: 20, height: 20, borderRadius: 10 },
-  legendContainer: { backgroundColor: '#fff', borderRadius: 20, padding: 15, marginTop: 10, elevation: 3, alignItems: 'center' },
-  legendHeader: { fontSize: 12, fontWeight: 'bold', color: '#5C2C00', marginBottom: 8, alignSelf: 'flex-start' },
-  legendRow: { flexDirection: 'row', justifyContent: 'center', gap: 15 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  miniDot: { width: 13, height: 13, borderRadius: 10 },
-  legendText: { fontSize: 13, fontWeight: '600', color: '#5C2C00' },
-  // STYLE TAMBAHAN UNTUK EMPTY STATE
-  emptyContainer: { alignItems: 'center', marginTop: 50, paddingHorizontal: 20 },
-  emptyText: { marginTop: 15, fontSize: 16, color: '#5C2C00', textAlign: 'center' },
+  container: {
+    flex: 1,
+    backgroundColor: '#FEF2DB',
+  },
+
+  fixedHeader: {
+    paddingHorizontal: 25,
+    backgroundColor: '#FEF2DB',
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 35,
+  },
+
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FF8F29',
+    elevation: 4,
+  },
+
+  titleContainer: {
+    maxWidth: '70%',
+  },
+
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+    textAlign: 'center',
+  },
+
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 45,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#5C2C00',
+  },
+
+  editButton: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#5C2C00',
+    elevation: 3,
+  },
+
+  orangeBanner: {
+    paddingVertical: 16,
+    marginBottom: 10,
+    borderRadius: 15,
+    backgroundColor: '#FF8F29',
+    elevation: 3,
+  },
+
+  bannerText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFDF0',
+    textAlign: 'center',
+  },
+
+  scrollContent: {
+    paddingTop: 10,
+    paddingHorizontal: 25,
+    paddingBottom: 40,
+  },
+
+  checklistCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 18,
+    backgroundColor: '#FFFDF0',
+    elevation: 2,
+  },
+
+  checklistTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+  },
+
+  statusCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+
+  legendContainer: {
+    alignItems: 'center',
+    padding: 15,
+    marginTop: 10,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    elevation: 3,
+  },
+
+  legendHeader: {
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+  },
+
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 15,
+  },
+
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  miniDot: {
+    width: 13,
+    height: 13,
+    borderRadius: 10,
+  },
+
+  legendText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5C2C00',
+  },
+
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 50,
+    paddingHorizontal: 20,
+  },
+
+  emptyText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#5C2C00',
+    textAlign: 'center',
+  },
 });

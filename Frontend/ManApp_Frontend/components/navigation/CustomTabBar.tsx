@@ -5,7 +5,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import Animated, {
   useSharedValue,
@@ -32,8 +32,8 @@ const tabs = [
 
   {
     name: 'input-file',
-    icon: 'add-circle-outline',
-    activeIcon: 'add-circle',
+    icon: 'cloud-upload-outline',
+    activeIcon: 'cloud-upload',
   },
 
   {
@@ -163,6 +163,7 @@ function TabIcon({
   icon,
   activeIcon,
 }: any) {
+
   const animatedIconStyle = useAnimatedStyle(() => {
     const translateY = interpolate(
       activeIndex.value,
@@ -190,19 +191,23 @@ function TabIcon({
     };
   });
 
+  const isActive = Math.round(activeIndex.value) === index;
+
   return (
     <Animated.View style={animatedIconStyle}>
-      <Ionicons
-        name={
-          (
-            Math.round(activeIndex.value) === index
-              ? activeIcon
-              : icon
-          ) as any
-        }
-        size={24}
-        color="#fff"
-      />
+      {icon === 'cloud-upload-outline' ? (
+        <MaterialCommunityIcons
+          name={isActive ? 'file-upload' : 'file-upload-outline'}
+          size={24}
+          color="#fff"
+        />
+      ) : (
+        <Ionicons
+          name={(isActive ? activeIcon : icon) as any}
+          size={24}
+          color="#fff"
+        />
+      )}
     </Animated.View>
   );
 }

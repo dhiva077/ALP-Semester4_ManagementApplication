@@ -217,7 +217,7 @@ export default function TambahEvent() {
           <Text style={styles.uploadText}>Tambah Berkas</Text>
         </TouchableOpacity>
 
-        <Text style={styles.fileCriteria}>Kriteria file: PKS_NamaEvent, Invoice_NamaEvent</Text>
+        {/* File criteria text removed as requested */}
 
         <TouchableOpacity style={styles.btnSimpan} onPress={validateAndSave}>
           <Text style={styles.btnText}>Simpan Event</Text>
@@ -330,77 +330,412 @@ export default function TambahEvent() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FDF5E6' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: Platform.OS === 'android' ? 30 : 10, marginBottom: 10 },
-  backButton: { backgroundColor: '#FF9800', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 4 },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: 'bold', color: '#4E342E', marginRight: 40 },
-  scrollContent: { paddingHorizontal: 25, paddingBottom: 40 },
-  sectionLabel: { fontSize: 14, fontWeight: 'bold', color: '#8D6E63', marginBottom: 10, marginTop: 15 },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 12, paddingHorizontal: 15, height: 50, marginBottom: 12, elevation: 2 },
-  inputContainerMultiline: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 12, paddingHorizontal: 15, minHeight: 100, marginBottom: 12, elevation: 2, paddingTop: 10 },
-  icon: { marginRight: 10 },
-  iconMultiline: { marginRight: 10, marginTop: 5 },
-  input: { flex: 1, fontSize: 14, color: '#4E342E' },
-  boldText: { fontWeight: 'bold' },
-  placeholderText: { color: '#A1887F' },
-  descriptionInput: { flex: 1, textAlignVertical: 'top' },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dash: { fontSize: 20, fontWeight: 'bold', color: '#4E342E', marginBottom: 10 },
-  fileItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 12, borderRadius: 12, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: '#FF8C00', elevation: 2 },
-  fileItemName: { flex: 1, marginLeft: 10, fontSize: 13, color: '#4E342E', fontWeight: '600' },
-  uploadArea: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF', borderRadius: 12, height: 50, borderWidth: 1, borderColor: '#8D6E63', borderStyle: 'dashed', marginTop: 5 },
-  uploadText: { marginLeft: 10, color: '#8D6E63', fontWeight: 'bold' },
-  
-  fileCriteria: { color: '#5C2C00', fontSize: 11, marginTop: 8, marginBottom: 20, textAlign: 'center' },
-  
-  btnSimpan: { backgroundColor: '#FF8C00', height: 55, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginTop: 10, elevation: 5 },
-  btnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  calendarCard: { width: '90%', backgroundColor: '#fff', borderRadius: 25, overflow: 'hidden', elevation: 20 },
-  calendarHeader: { backgroundColor: '#FF8F29', padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dropdownBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15 },
-  calendarTitle: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  calendarBody: { padding: 15 },
-  weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  dayLabel: { width: '14%', textAlign: 'center', color: '#5C2C00', fontWeight: 'bold' },
-  dateGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  dateCell: { width: '14%', alignItems: 'center', height: 40, justifyContent: 'center' },
-  dateText: { color: '#5C2C00' },
-  selectedDateCell: { backgroundColor: '#FF8C00', borderRadius: 10 },
-  selectedDateText: { color: '#FFF', fontWeight: 'bold' },
-  closeBtn: { padding: 15, alignItems: 'center', borderTopWidth: 1, borderColor: '#EEE' },
-  pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modernPickerCard: { 
-    backgroundColor: '#FFF', 
-    borderTopLeftRadius: 30, 
-    borderTopRightRadius: 30, 
-    paddingHorizontal: 20, 
-    paddingBottom: Platform.OS === 'ios' ? 40 : 25, 
+  container: {
+    flex: 1,
+    backgroundColor: '#FDF5E6',
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: Platform.OS === 'android' ? 30 : 10,
+    marginBottom: 10,
+  },
+
+  backButton: {
+    backgroundColor: '#FF9800',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+  },
+
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4E342E',
+    marginRight: 40,
+  },
+
+  scrollContent: {
+    paddingHorizontal: 25,
+    paddingBottom: 40,
+  },
+
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#8D6E63',
+    marginBottom: 10,
+    marginTop: 15,
+  },
+
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    height: 50,
+    marginBottom: 12,
+    elevation: 2,
+  },
+
+  inputContainerMultiline: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    minHeight: 100,
+    marginBottom: 12,
+    elevation: 2,
+    paddingTop: 10,
+  },
+
+  icon: {
+    marginRight: 10,
+  },
+
+  iconMultiline: {
+    marginRight: 10,
+    marginTop: 5,
+  },
+
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: '#4E342E',
+  },
+
+  boldText: {
+    fontWeight: 'bold',
+  },
+
+  placeholderText: {
+    color: '#A1887F',
+  },
+
+  descriptionInput: {
+    flex: 1,
+    textAlignVertical: 'top',
+  },
+
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  dash: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4E342E',
+    marginBottom: 10,
+  },
+
+  fileItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF8C00',
+    elevation: 2,
+  },
+
+  fileItemName: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 13,
+    color: '#4E342E',
+    fontWeight: '600',
+  },
+
+  uploadArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#8D6E63',
+    borderStyle: 'dashed',
+    marginTop: 5,
+  },
+
+  uploadText: {
+    marginLeft: 10,
+    color: '#8D6E63',
+    fontWeight: 'bold',
+  },
+
+  fileCriteria: {
+    color: '#5C2C00',
+    fontSize: 11,
+    marginTop: 8,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+
+  btnSimpan: {
+    backgroundColor: '#FF8C00',
+    height: 55,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    elevation: 5,
+  },
+
+  btnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  calendarCard: {
+    width: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    overflow: 'hidden',
+    elevation: 20,
+  },
+
+  calendarHeader: {
+    backgroundColor: '#FF8F29',
+    padding: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  dropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+
+  calendarTitle: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
+  calendarBody: {
+    padding: 15,
+  },
+
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  dayLabel: {
+    width: '14%',
+    textAlign: 'center',
+    color: '#5C2C00',
+    fontWeight: 'bold',
+  },
+
+  dateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  dateCell: {
+    width: '14%',
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'center',
+  },
+
+  dateText: {
+    color: '#5C2C00',
+  },
+
+  selectedDateCell: {
+    backgroundColor: '#FF8C00',
+    borderRadius: 10,
+  },
+
+  selectedDateText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+
+  closeBtn: {
+    padding: 15,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderColor: '#EEE',
+  },
+
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+
+  modernPickerCard: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 25,
     paddingTop: 10,
     height: '60%',
     elevation: 25,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
+    shadowOffset: {
+      width: 0,
+      height: -10,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 10
+    shadowRadius: 10,
   },
-  pickerHeaderIndicator: { width: 40, height: 5, backgroundColor: '#E0E0E0', borderRadius: 10, alignSelf: 'center', marginBottom: 20 },
-  pickerModalTitle: { fontSize: 20, fontWeight: '800', color: '#4E342E', textAlign: 'center', marginBottom: 20 },
-  pickerContentRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-between' },
-  pickerCol: { flex: 1 },
-  colLabel: { textAlign: 'center', fontSize: 12, fontWeight: 'bold', color: '#A1887F', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
-  scrollPadding: { paddingBottom: 20 },
-  pickerDivider: { width: 1, backgroundColor: '#F0F0F0', marginHorizontal: 10, height: '100%' },
-  modernPickerItem: { paddingVertical: 12, alignItems: 'center', marginVertical: 4, borderRadius: 12 },
-  modernActiveItem: { backgroundColor: '#FFF3E0', borderWidth: 1, borderColor: '#FF8C00' },
-  modernPickerText: { fontSize: 16, color: '#8D6E63', fontWeight: '500' },
-  modernActiveText: { color: '#FF8C00', fontWeight: 'bold', fontSize: 18 },
-  pickerActionRow: { flexDirection: 'row', gap: 15, marginTop: 20 },
-  btnSecondary: { flex: 1, padding: 16, borderRadius: 15, backgroundColor: '#F5F5F5', alignItems: 'center' },
-  btnSecondaryText: { color: '#8D6E63', fontWeight: 'bold' },
-  btnPrimary: { flex: 2, padding: 16, backgroundColor: '#FF8C00', borderRadius: 15, alignItems: 'center', elevation: 3 },
-  btnPrimaryText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  locationModal: { width: '80%', backgroundColor: '#FFF', borderRadius: 20, padding: 20, elevation: 10 },
-  optionItem: { paddingVertical: 15, borderBottomWidth: 0.5, borderBottomColor: '#EEE' },
-  optionText: { color: '#4E342E', fontSize: 15 },
+
+  pickerHeaderIndicator: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 10,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+
+  pickerModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#4E342E',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+
+  pickerContentRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  pickerCol: {
+    flex: 1,
+  },
+
+  colLabel: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#A1887F',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+
+  scrollPadding: {
+    paddingBottom: 20,
+  },
+
+  pickerDivider: {
+    width: 1,
+    backgroundColor: '#F0F0F0',
+    marginHorizontal: 10,
+    height: '100%',
+  },
+
+  modernPickerItem: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginVertical: 4,
+    borderRadius: 12,
+  },
+
+  modernActiveItem: {
+    backgroundColor: '#FFF3E0',
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+  },
+
+  modernPickerText: {
+    fontSize: 16,
+    color: '#8D6E63',
+    fontWeight: '500',
+  },
+
+  modernActiveText: {
+    color: '#FF8C00',
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+
+  pickerActionRow: {
+    flexDirection: 'row',
+    gap: 15,
+    marginTop: 20,
+  },
+
+  btnSecondary: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 15,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+  },
+
+  btnSecondaryText: {
+    color: '#8D6E63',
+    fontWeight: 'bold',
+  },
+
+  btnPrimary: {
+    flex: 2,
+    padding: 16,
+    backgroundColor: '#FF8C00',
+    borderRadius: 15,
+    alignItems: 'center',
+    elevation: 3,
+  },
+
+  btnPrimaryText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
+  locationModal: {
+    width: '80%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 10,
+  },
+
+  optionItem: {
+    paddingVertical: 15,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#EEE',
+  },
+
+  optionText: {
+    color: '#4E342E',
+    fontSize: 15,
+  },
 });
