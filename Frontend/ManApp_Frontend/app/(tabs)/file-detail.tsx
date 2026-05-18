@@ -12,14 +12,18 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Linking from 'expo-linking';
+import { buildFileUrl, updateFileStatus, uploadEventPdf } from '../../src/services/fileApi';
 
 export default function FileDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { title, eventName, eventDate, source, fileUri, checklistId } = params;
+  const { title, eventName, eventDate, source, fileUrl, filePath, docKey, eventId } = params;
 
-  const [currentFileUri, setCurrentFileUri] = useState<string | null>(fileUri as string || null);
+  const [currentFileUri, setCurrentFileUri] = useState<string | null>(
+    (fileUrl as string) || buildFileUrl(filePath as string) || null
+  );
   const [isManager, setIsManager] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const loadCurrentUser = async () => {
@@ -27,7 +31,7 @@ export default function FileDetail() {
         const savedUser = await AsyncStorage.getItem('user');
         if (savedUser) {
           const parsed = JSON.parse(savedUser);
-          setIsManager(parsed?.email?.toLowerCase() === 'wulan.purnamasari@ciputra.ac.id');
+          setIsManager(parsed?.role === 'manager' || parsed?.email?.toLowerCase() === 'wulan.purnamasari@ciputra.ac.id');
         }
       } catch (error) {
         console.error('Failed to load current user:', error);
@@ -44,21 +48,8 @@ export default function FileDetail() {
       params: { 
         eventName, 
         eventDate,
-        source
-      }
-    });
-  };
-
-  const navigateBackWithStatus = (statusColor: 'yellow' | 'green' | 'red') => {
-    router.replace({
-      pathname: '/(tabs)/checklist',
-      params: { 
-        eventName, 
-        eventDate,
         source,
-        updatedStatus: statusColor,
-        checklistId, // Kirim ID balik agar Checklist tahu lampu mana yang berubah
-        docTitle: title
+        eventId,
       }
     });
   };
@@ -67,16 +58,43 @@ export default function FileDetail() {
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf" });
       if (!result.canceled) {
-        setCurrentFileUri(result.assets[0].uri);
+        if (!eventId || !docKey) {
+          Alert.alert('Gagal', 'Event atau dokumen tidak valid.');
+          return;
+        }
+
+        setIsSubmitting(true);
+        const uploaded = await uploadEventPdf(Number(eventId), result.assets[0].uri, result.assets[0].name);
+        const newUrl = buildFileUrl(uploaded?.path) || result.assets[0].uri;
+        setCurrentFileUri(newUrl);
         Alert.alert("Berhasil", "File berhasil diganti.");
       }
     } catch (err) { console.error(err); }
+    finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteFile = () => {
     Alert.alert("Hapus File", "Apakah Anda yakin ingin menghapus file ini?", [
       { text: "Batal", style: "cancel" },
-      { text: "Hapus", style: "destructive", onPress: () => navigateBackWithStatus('red') }
+      { text: "Hapus", style: "destructive", onPress: async () => {
+          if (!eventId || !docKey) {
+            Alert.alert('Gagal', 'Event atau dokumen tidak valid.');
+            return;
+          }
+          try {
+            setIsSubmitting(true);
+            await updateFileStatus(Number(eventId), String(docKey), 'B');
+            handleBackToChecklist();
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Gagal menghapus file.';
+            Alert.alert('Gagal', msg);
+          } finally {
+            setIsSubmitting(false);
+          }
+        }
+      }
     ]);
   };
 
@@ -91,7 +109,22 @@ export default function FileDetail() {
   const handleSelesai = () => {
     Alert.alert("Konfirmasi Selesai", "Dokumen ini akan ditandai sebagai Selesai.", [
       { text: "Batal", style: "cancel" },
-      { text: "Ya, Selesai", onPress: () => navigateBackWithStatus('green') }
+      { text: "Ya, Selesai", onPress: async () => {
+          if (!eventId || !docKey) {
+            Alert.alert('Gagal', 'Event atau dokumen tidak valid.');
+            return;
+          }
+          try {
+            setIsSubmitting(true);
+            await updateFileStatus(Number(eventId), String(docKey), 'S');
+            handleBackToChecklist();
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Gagal memperbarui status.';
+            Alert.alert('Gagal', msg);
+          } finally {
+            setIsSubmitting(false);
+          }
+        } }
     ]);
   };
 
@@ -109,7 +142,7 @@ export default function FileDetail() {
         <View style={styles.previewCard}>
           <View style={styles.cardHeader}><Text style={styles.cardHeaderText}>{title}</Text></View>
           <View style={styles.documentPlaceholder}>
-             <Ionicons name="document-text" size={80} color="rgba(255,255,255,0.2)" />
+            <Ionicons name="document-text" size={80} color="rgba(255,255,255,0.2)" />
           </View>
           <View style={styles.cardActions}>
             <TouchableOpacity style={styles.actionItem} onPress={handlePickFile}>
@@ -126,10 +159,29 @@ export default function FileDetail() {
 
         {isManager && (
           <View style={styles.decisionRow}>
-            <TouchableOpacity style={[styles.btnDecision, styles.btnRevisi]} onPress={() => navigateBackWithStatus('yellow')}>
+            <TouchableOpacity
+              style={[styles.btnDecision, styles.btnRevisi, isSubmitting && { opacity: 0.6 }]}
+              onPress={async () => {
+                if (!eventId || !docKey) {
+                  Alert.alert('Gagal', 'Event atau dokumen tidak valid.');
+                  return;
+                }
+                try {
+                  setIsSubmitting(true);
+                  await updateFileStatus(Number(eventId), String(docKey), 'R');
+                  handleBackToChecklist();
+                } catch (error) {
+                  const msg = error instanceof Error ? error.message : 'Gagal memperbarui status.';
+                  Alert.alert('Gagal', msg);
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              disabled={isSubmitting}
+            >
               <Ionicons name="alert-circle" size={20} color="#FFF" /><Text style={styles.btnDecisionText}>Revisi</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btnDecision, styles.btnSelesai]} onPress={handleSelesai}>
+            <TouchableOpacity style={[styles.btnDecision, styles.btnSelesai, isSubmitting && { opacity: 0.6 }]} onPress={handleSelesai} disabled={isSubmitting}>
               <Ionicons name="checkmark-circle" size={20} color="#FFF" /><Text style={styles.btnDecisionText}>Selesai</Text>
             </TouchableOpacity>
           </View>
@@ -204,6 +256,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#4E2A00',
   },
+
 
   cardActions: {
     flexDirection: 'row',

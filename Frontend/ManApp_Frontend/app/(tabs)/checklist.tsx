@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -8,107 +8,109 @@ import {
   SafeAreaView, 
   ScrollView,
 } from 'react-native';
-
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { EVENT_DATA, normalizeName } from '../../src/data/events';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { fetchEvents } from '../../src/services/eventService';
+import { fetchFiles, buildFileUrl } from '../../src/services/fileApi';
 
 const BASE_CHECKLIST = [
-  { id: 1, title: "From Checklist Sebelum Acara" },
-  { id: 2, title: "Surat Perjanjian Kerjasama" },
-  { id: 3, title: "Invoice" },
-  { id: 4, title: "Lembar Disposisi" },
-  { id: 5, title: "Surat Izin Loading" },
-  { id: 6, title: "From Checklist Setelah Acara" },
+  { id: 1, title: "From Checklist Sebelum Acara", docKey: 'form_checklist_sebelum_acara', statusKey: 'statusFormChecklistSebelumAcara' },
+  { id: 2, title: "Surat Perjanjian Kerjasama", docKey: 'surat_perjanjian_kerjasama', statusKey: 'statusSuratPerjanjianKerjasama' },
+  { id: 3, title: "Invoice", docKey: 'invoice', statusKey: 'statusInvoice' },
+  { id: 4, title: "Lembar Disposisi", docKey: 'lembar_disposisi', statusKey: 'statusLembarDisposisi' },
+  { id: 5, title: "Surat Izin Loading", docKey: 'surat_izin_loading', statusKey: 'statusSuratIzinLoading' },
+  { id: 6, title: "From Checklist Setelah Acara", docKey: 'form_checklist_setelah_acara', statusKey: 'statusFormChecklistSetelahAcara' },
 ];
-
-const EVENT_STATUS_CONFIG: Record<string, string[]> = {
-  "Meeting Koordinasi": ["belum", "belum", "belum", "belum", "belum", "belum"],
-  "Wisuda Santri TK/TPA Barokah": ["selesai", "selesai", "selesai", "selesai", "selesai", "selesai"],
-  "Pameran Buku by Gramedia": ["selesai", "revisi", "selesai", "belum", "selesai", "belum"],
-  "Mayora Goes to Campus": ["selesai", "selesai", "revisi", "revisi", "belum", "belum"],
-};
 
 export default function Checklist() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { eventName, eventDate, source, updatedStatus, checklistId } = params;
+  const { eventName, eventDate, source, eventId } = params;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [checklistMap, setChecklistMap] = useState<Record<string, string[]>>({});
+  const [currentEvent, setCurrentEvent] = useState<any>(null);
+  const [fileRecord, setFileRecord] = useState<any>(null);
 
   const currentEventName = typeof eventName === 'string' ? eventName : "Detail Event";
   const currentEventDate = typeof eventDate === 'string' ? eventDate : "";
   const sourceFrom = typeof source === 'string' ? source : 'dashboard';
-  const CHECKLIST_KEY = 'CHECKLIST_DATA';
+  const getEventDate = (event: any) => {
+    const start = event?.start_time || '';
+    return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+  };
 
-  const loadChecklist = async () => {
+  const loadData = async () => {
     try {
-      const saved = await AsyncStorage.getItem(CHECKLIST_KEY);
-      const data = saved ? JSON.parse(saved) : {};
-      setChecklistMap(data);
+      const [events, files] = await Promise.all([fetchEvents(), fetchFiles()]);
+
+      let matched = null;
+      if (eventId) {
+        matched = events.find((e: any) => String(e.id) === String(eventId));
+      }
+
+      if (!matched && eventName) {
+        matched = events.find((e: any) => e.name === eventName);
+      }
+
+      if (!matched && eventDate) {
+        matched = events.find((e: any) => getEventDate(e) === eventDate);
+      }
+
+      if (!matched && eventName) {
+        const fileMatched = files.find((file: any) => file?.event?.name === eventName);
+        matched = fileMatched?.event || null;
+      }
+
+      setCurrentEvent(matched || null);
+
+      const eventIdValue = matched?.id || eventId;
+      let relatedFile = null;
+      if (eventIdValue) {
+        relatedFile = files.find((file: any) => String(file.event_id) === String(eventIdValue));
+      }
+      if (!relatedFile && eventName) {
+        relatedFile = files.find((file: any) => file?.event?.name === eventName);
+      }
+      if (!relatedFile && eventDate) {
+        relatedFile = files.find((file: any) => {
+          const fileDate = getEventDate(file?.event || {});
+          return fileDate === eventDate;
+        });
+      }
+
+      setFileRecord(relatedFile || null);
     } catch (error) {
-      setChecklistMap({});
+      console.error('Load checklist error:', error);
     }
   };
 
-  useEffect(() => {
-    if (updatedStatus && checklistId) {
-      const updateStatusPermanently = async () => {
-        try {
-          const saved = await AsyncStorage.getItem(CHECKLIST_KEY);
-          let data = saved ? JSON.parse(saved) : {};
-          
-          let currentStatuses = data[currentEventName] || 
-            EVENT_STATUS_CONFIG[currentEventName] || 
-            ["belum", "belum", "belum", "belum", "belum", "belum"];
-
-          const idx = parseInt(checklistId as string) - 1;
-          
-          let newStatus = "belum";
-          if (updatedStatus === 'green') newStatus = "selesai";
-          if (updatedStatus === 'yellow') newStatus = "revisi";
-          if (updatedStatus === 'red') newStatus = "belum";
-
-          currentStatuses[idx] = newStatus;
-          data[currentEventName] = [...currentStatuses];
-
-          await AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(data));
-          setChecklistMap({...data});
-
-          router.setParams({ updatedStatus: undefined, checklistId: undefined });
-        } catch (e) {
-          console.error("Sync Error:", e);
-        }
-      };
-      updateStatusPermanently();
-    }
-  }, [updatedStatus, checklistId]);
-
   useFocusEffect(
     useCallback(() => {
-      loadChecklist();
-    }, [])
+      loadData();
+    }, [eventId, eventName, eventDate])
   );
-
-  const statusArray =
-    checklistMap[currentEventName] ||
-    EVENT_STATUS_CONFIG[currentEventName] ||
-    ["belum", "belum", "belum", "belum", "belum", "belum"];
 
   const filteredChecklist = BASE_CHECKLIST.filter((item) =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'selesai': return '#606C38';
-      case 'revisi': return '#EA9B03';
-      case 'belum': return '#FF383C';
-      default: return '#CCC';
+  const getStatusColor = (statusCode: string) => {
+    switch (statusCode) {
+      case 'S': return '#606C38';
+      case 'R': return '#EA9B03';
+      case 'B': return '#FF383C';
+      default: return '#FF383C';
     }
+  };
+
+  const toSnake = (value: string) => value.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+
+  const getStatusCode = (statusKey: string, docKey: string) => {
+    const resolvedStatus = fileRecord?.[statusKey] ?? fileRecord?.[toSnake(statusKey)];
+    if (resolvedStatus?.code) return resolvedStatus.code;
+    if (fileRecord?.[docKey]) return 'S';
+    return 'B';
   };
 
   return (
@@ -156,51 +158,45 @@ export default function Checklist() {
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="file-search-outline" size={80} color="#D2B48C" />
             <Text style={styles.emptyText}>
-              "<Text style={{ fontWeight: 'bold' }}>{searchQuery}</Text>" tidak ditemukan
+              {'"'}<Text style={{ fontWeight: 'bold' }}>{searchQuery}</Text>{'"'} tidak ditemukan
             </Text>
           </View>
         ) : (
           filteredChecklist.map((item) => {
-            const originalIndex = BASE_CHECKLIST.findIndex(baseItem => baseItem.id === item.id);
-            const currentStatus = statusArray[originalIndex];
+            const statusCode = getStatusCode(item.statusKey, item.docKey);
+            const filePath = fileRecord?.[item.docKey] || null;
+            const fileUrlFromApi = fileRecord?.[`${item.docKey}_url`] || null;
+            const hasFile = !!filePath && statusCode !== 'B';
+            const path = hasFile ? '/(tabs)/file-detail' : '/(tabs)/input-file';
+            const eventNameValue = currentEvent?.name || currentEventName;
+            const eventDateValue = currentEvent ? getEventDate(currentEvent) : currentEventDate;
+            const eventIdValue = currentEvent?.id || eventId;
 
             return (
               <TouchableOpacity
                 key={item.id}
                 style={styles.checklistCard}
                 onPress={() => {
-                  const path = currentStatus === 'belum' ? '/(tabs)/input-file' : '/(tabs)/file-detail';
-                  
-                  // ALGORITMA PENCOCOKAN MULTI-LAYER (Nama -> Tanggal -> Substring)
-                  let matched = EVENT_DATA.find(e => normalizeName(e.name) === normalizeName(currentEventName));
-                  
-                  if (!matched && currentEventDate) {
-                    matched = EVENT_DATA.find(e => e.date === currentEventDate);
-                  }
-                  
-                  if (!matched && currentEventName !== "Detail Event") {
-                    matched = EVENT_DATA.find(e => 
-                      normalizeName(e.name).includes(normalizeName(currentEventName)) ||
-                      normalizeName(currentEventName).includes(normalizeName(e.name))
-                    );
-                  }
-                  
                   router.push({
                     pathname: path,
                     params: {
                       title: item.title,
-                      eventName: matched ? matched.name : currentEventName,
-                      eventDate: matched ? matched.date : currentEventDate,
+                      eventName: eventNameValue,
+                      eventDate: eventDateValue,
+                      eventId: eventIdValue,
                       checklistId: item.id,
+                      docKey: item.docKey,
+                      filePath: filePath || undefined,
+                      fileUrl: buildFileUrl(fileUrlFromApi || filePath) || undefined,
                       source: sourceFrom,
-                      location: matched ? matched.location : (params.location && params.location !== 'Lokasi tidak ditemukan' ? params.location : 'Dian Auditorium'),
-                      pic: matched ? matched.pic : (params.pic && params.pic !== 'Petugas' ? params.pic : 'Fathir'),
+                      location: currentEvent?.location || params.location,
+                      pic: currentEvent?.user?.name || params.pic,
                     }
                   });
                 }}
               >
                 <Text style={styles.checklistTitle}>{item.title}</Text>
-                <View style={[styles.statusCircle, { backgroundColor: getStatusColor(currentStatus) }]} />
+                <View style={[styles.statusCircle, { backgroundColor: getStatusColor(statusCode) }]} />
               </TouchableOpacity>
             );
           })

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { loginService } from '../services/authService';
 
 const USER_DATA_MAP: Record<string, { name: string; role: string }> = {
   'wulan.purnamasari@ciputra.ac.id': { name: 'Wulan Purnamasari', role: 'manager' },
@@ -42,6 +43,11 @@ export default function useLoginViewModel() {
       return;
     }
 
+    if (!password) {
+      Alert.alert('Login Ditolak', 'Password tidak boleh kosong.');
+      return;
+    }
+
     if (!ALLOWED_DOMAINS.some((domain) => normalizedEmail.endsWith(domain))) {
       Alert.alert('Login Ditolak', 'Gunakan email UC yang valid.');
       return;
@@ -50,16 +56,18 @@ export default function useLoginViewModel() {
     try {
       setIsLoading(true);
 
+      const backendUser = await loginService(normalizedEmail, password);
       const mappedUser = USER_DATA_MAP[normalizedEmail];
       const userData = {
-        name: mappedUser?.name ?? getDefaultNameFromEmail(normalizedEmail),
-        email: normalizedEmail,
+        ...backendUser,
+        name: backendUser?.name ?? mappedUser?.name ?? getDefaultNameFromEmail(normalizedEmail),
+        email: backendUser?.email ?? normalizedEmail,
         role: mappedUser?.role ?? 'pic',
       };
 
       await AsyncStorage.multiSet([
         ['isLoggedIn', 'true'],
-        ['authProvider', 'manual'],
+        ['authProvider', 'backend'],
         ['user', JSON.stringify(userData)],
       ]);
 

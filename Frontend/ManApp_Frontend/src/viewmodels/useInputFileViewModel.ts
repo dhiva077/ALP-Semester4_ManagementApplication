@@ -12,9 +12,9 @@ export default function useInputFileViewModel() {
   const handlePickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*', // Kamu bisa ganti ke ['application/pdf', 'application/vnd.ms-excel'] jika ingin spesifik
+        type: 'application/pdf',
         copyToCacheDirectory: true,
-        multiple: true, // INI KUNCINYA agar user bisa pilih banyak file sekaligus
+        multiple: true,
       });
 
       if (!result.canceled) {
@@ -26,14 +26,23 @@ export default function useInputFileViewModel() {
 
         // Gabungkan dengan file yang sudah ada sebelumnya
         setSelectedFiles((prev) => [...prev, ...newFiles]);
+
+        return newFiles;
       }
+
+      return [];
     } catch (err) {
       console.error("Gagal mengambil dokumen:", err);
+      return [];
     }
   };
 
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeFileByUri = (uri: string) => {
+    setSelectedFiles((prev) => prev.filter((file) => file.uri !== uri));
   };
 
   const clearAllFiles = () => {
@@ -44,6 +53,7 @@ export default function useInputFileViewModel() {
     selectedFiles,
     handlePickFile,
     removeFile,
+    removeFileByUri,
     clearAllFiles,
   };
 }
