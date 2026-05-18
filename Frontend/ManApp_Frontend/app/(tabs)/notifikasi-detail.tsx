@@ -12,8 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const STORAGE_KEY = 'MANAPP_EVENTS';
+import { fetchEvents } from '../../src/services/eventService';
 
 export default function NotifikasiDetail() {
   const router = useRouter();
@@ -26,12 +25,11 @@ export default function NotifikasiDetail() {
 
   const loadEvent = async () => {
     try {
-      const savedEvents = await AsyncStorage.getItem(STORAGE_KEY);
-      const events = savedEvents ? JSON.parse(savedEvents) : {};
-      const eventList = events[date] || [];
-      const foundEvent = eventList.find((item: any) => item.title === title);
+      const allEvents = await fetchEvents();
+      const foundEvent = allEvents.find((item: any) => item.name === title && item.start_time === date);
       setEventData(foundEvent || null);
     } catch (error) {
+      console.error("error fetching event:", error);
       setEventData(null);
     } finally {
       setLoading(false);
@@ -69,7 +67,7 @@ export default function NotifikasiDetail() {
           <ActivityIndicator size="large" color="#FF8C2B" style={{ marginTop: 60 }} />
         ) : eventData ? (
           <View style={styles.card}>
-            <Text style={styles.title}>{eventData.title}</Text>
+            <Text style={styles.title}>{eventData.name}</Text>
             
             <Text style={styles.subtitle}>Tanggal Event</Text>
             <Text style={styles.detailText}>{date}</Text>
@@ -77,8 +75,12 @@ export default function NotifikasiDetail() {
             <Text style={styles.subtitle}>Lokasi</Text>
             <Text style={styles.detailText}>{eventData.location}</Text>
             
-            <Text style={styles.subtitle}>Waktu</Text>
-            <Text style={styles.detailText}>{eventData.time}</Text>
+            {eventData.time && (
+              <>
+                <Text style={styles.subtitle}>Waktu</Text>
+                <Text style={styles.detailText}>{eventData.time}</Text>
+              </>
+            )}
             
             <Text style={styles.subtitle}>Pesan</Text>
             <Text style={styles.detailText}>{`Masih ada beberapa file yang belum lengkap. Segera cek checklist agar persiapan event berjalan lancar.`}</Text>
