@@ -19,6 +19,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { fetchEvents } from '../../src/services/eventService';
 
 const { width } = Dimensions.get('window');
 
@@ -41,7 +42,8 @@ export default function Profile() {
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_PRESETS[0].uri);
   const [expandedHistory, setExpandedHistory] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string; role?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id?: number; name?: string; email?: string; role?: string } | null>(null);
+  const [historyEvents, setHistoryEvents] = useState<any[]>([]);
 
   const PROFILE_IMAGE_KEY = 'USER_PROFILE_IMAGE'; 
   const DEFAULT_AVATAR = AVATAR_PRESETS[0].uri;
@@ -52,16 +54,25 @@ export default function Profile() {
         const savedUser = await AsyncStorage.getItem('user');
         const savedAvatar = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
         
+        let loadedUser = null;
         if (savedUser) {
-          setCurrentUser(JSON.parse(savedUser));
+          loadedUser = JSON.parse(savedUser);
+          setCurrentUser(loadedUser);
         }
         if (savedAvatar) {
           setSelectedAvatar(savedAvatar);
         } else {
           setSelectedAvatar(DEFAULT_AVATAR);
         }
+
+        // Fetch events for history
+        if (loadedUser?.id) {
+            const allEvents = await fetchEvents();
+            const userEvents = allEvents.filter((ev: any) => ev.user_id === loadedUser.id);
+            setHistoryEvents(userEvents);
+        }
       } catch (error) {
-        console.error('Failed load profile user:', error);
+        console.error('Failed load profile data:', error);
       }
     };
 
@@ -179,27 +190,29 @@ export default function Profile() {
 
           {expandedHistory && (
             <View style={styles.dropdownContent}>
-              <View style={styles.eventItem}>
-                <View style={styles.eventDot} />
-                <View style={styles.eventInfo}>
-                  <Text style={styles.eventName}>Webinar Nasional IT 2026</Text>
-                  <Text style={styles.eventDate}>10 Mei 2026 • PIC Utama</Text>
-                </View>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>Selesai</Text>
-                </View>
-              </View>
-              
-              <View style={[styles.eventItem, { marginTop: 15 }]}>
-                <View style={styles.eventDot} />
-                <View style={styles.eventInfo}>
-                  <Text style={styles.eventName}>Workshop React Native</Text>
-                  <Text style={styles.eventDate}>15 April 2026 • Mentor</Text>
-                </View>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>Selesai</Text>
-                </View>
-              </View>
+              {historyEvents.length > 0 ? (
+                historyEvents.map((event, index) => {
+                  const eventDate = new Date(event.start_time).toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  });
+                  return (
+                    <View key={event.id || index} style={[styles.eventItem, index > 0 && { marginTop: 15 }]}>
+                      <View style={styles.eventDot} />
+                      <View style={styles.eventInfo}>
+                        <Text style={styles.eventName}>{event.name}</Text>
+                        <Text style={styles.eventDate}>{eventDate} • PIC Event</Text>
+                      </View>
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.statusText}>{event.status?.name || 'Selesai'}</Text>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={{ textAlign: 'center', color: '#888', marginTop: 10 }}>Belum ada riwayat event.</Text>
+              )}
             </View>
           )}
         </View>
