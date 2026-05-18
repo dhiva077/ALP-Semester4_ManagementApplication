@@ -10,6 +10,29 @@ use Smalot\PdfParser\Parser;
 
 class FileController extends Controller
 {
+    private function attachUrls(File $file, Request $request): File
+    {
+        $host = $request->getSchemeAndHttpHost();
+        $columns = [
+            'form_checklist_sebelum_acara',
+            'surat_perjanjian_kerjasama',
+            'invoice',
+            'lembar_disposisi',
+            'surat_izin_loading',
+            'form_checklist_setelah_acara',
+        ];
+
+        foreach ($columns as $column) {
+            $path = $file->{$column};
+            $file->setAttribute(
+                $column . '_url',
+                $path ? $host . Storage::url($path) : null
+            );
+        }
+
+        return $file;
+    }
+
     public function index()
     {
         $files = File::query()
@@ -23,7 +46,8 @@ class FileController extends Controller
                 'statusFormChecklistSetelahAcara',
             ])
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(fn (File $file) => $this->attachUrls($file, request()));
 
         return response()->json($files);
     }
@@ -50,7 +74,7 @@ class FileController extends Controller
 
         return response()->json([
             'message' => 'File berhasil dibuat.',
-            'file' => $file->load([
+            'file' => $this->attachUrls($file->load([
                 'event',
                 'statusFormChecklistSebelumAcara',
                 'statusSuratPerjanjianKerjasama',
@@ -58,14 +82,14 @@ class FileController extends Controller
                 'statusLembarDisposisi',
                 'statusSuratIzinLoading',
                 'statusFormChecklistSetelahAcara',
-            ]),
+            ]), $request),
         ], 201);
     }
 
     public function show(File $file)
     {
         return response()->json(
-            $file->load([
+            $this->attachUrls($file->load([
                 'event',
                 'statusFormChecklistSebelumAcara',
                 'statusSuratPerjanjianKerjasama',
@@ -73,7 +97,7 @@ class FileController extends Controller
                 'statusLembarDisposisi',
                 'statusSuratIzinLoading',
                 'statusFormChecklistSetelahAcara',
-            ])
+            ]), request())
         );
     }
 
@@ -100,7 +124,7 @@ class FileController extends Controller
 
         return response()->json([
             'message' => 'File berhasil diupdate.',
-            'file' => $file->load([
+            'file' => $this->attachUrls($file->load([
                 'event',
                 'statusFormChecklistSebelumAcara',
                 'statusSuratPerjanjianKerjasama',
@@ -108,7 +132,7 @@ class FileController extends Controller
                 'statusLembarDisposisi',
                 'statusSuratIzinLoading',
                 'statusFormChecklistSetelahAcara',
-            ]),
+            ]), $request),
         ]);
     }
 
@@ -274,16 +298,26 @@ class FileController extends Controller
             'type' => $type,
             'filename' => $filename,
             'path' => $path,
+            'url' => $request->getSchemeAndHttpHost() . Storage::url($path),
             'text_preview' => substr($text, 0, 200),
         ]);
     }
 
     public function updateStatus(Request $request)
     {
+        $allowedDocKeys = [
+            'form_checklist_sebelum_acara',
+            'surat_perjanjian_kerjasama',
+            'invoice',
+            'lembar_disposisi',
+            'surat_izin_loading',
+            'form_checklist_setelah_acara',
+        ];
+
         $validated = $request->validate([
             'event_id' => ['required', 'exists:events,id'],
-            'doc_key' => ['required', 'string'],
-            'status_code' => ['required', 'string', 'in:R,S'], // R = Revisi, S = Selesai
+            'doc_key' => ['required', 'string', 'in:' . implode(',', $allowedDocKeys)],
+            'status_code' => ['required', 'string', 'in:B,R,S'], // B = Belum, R = Revisi, S = Selesai
         ]);
 
         $eventId = $validated['event_id'];
@@ -300,6 +334,9 @@ class FileController extends Controller
         $statusId = Status::where('code', $statusCode)->value('id');
 
         $file->$statusColumn = $statusId;
+        if ($statusCode === 'B') {
+            $file->$docKey = null;
+        }
         $file->save();
 
         return response()->json([
@@ -307,4 +344,5 @@ class FileController extends Controller
             'status_code' => $statusCode
         ]);
     }
+
 }

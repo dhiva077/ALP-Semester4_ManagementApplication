@@ -12,29 +12,25 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { EVENT_DATA, normalizeName } from '../../src/data/events';
 import { useRouter } from 'expo-router';
+import { fetchEvents } from '../../src/services/eventService';
+import { fetchFiles } from '../../src/services/fileApi';
 
 // --- DATA PEMBANTU ---
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
 
-interface EventItem { id: number; title: string; location: string; time: string; color: string; }
+interface EventItem {
+  id: number;
+  title: string;
+  location: string;
+  time: string;
+  color: string;
+  date: string;
+  pic?: string;
+}
+
 interface EventData { [key: string]: EventItem[]; }
-
-const EVENT_STATUS_CONFIG: Record<string, string[]> = {
-  "Meeting Koordinasi": ["belum", "belum", "belum", "belum", "belum", "belum"],
-  "Wisuda Santri TK/TPA Barokah": ["selesai", "selesai", "selesai", "selesai", "selesai", "selesai"],
-  "Pameran Buku by Gramedia": ["selesai", "revisi", "selesai", "belum", "selesai", "belum"],
-  "Mayora Goes to Campus": ["selesai", "selesai", "revisi", "revisi", "belum", "belum"],
-};
-
-const MOCK_EVENTS: EventData = {
-  "2026-05-07": [{ id: 99, title: "Meeting Koordinasi", location: "Dian Auditorium UC Makassar, Lt.7", time: "09:00 - 11:00", color: "#FF383C" }],
-  "2026-06-05": [{ id: 100, title: "Wisuda Santri TK/TPA Barokah", location: "Dian Auditorium UC Makassar Lt7", time: "10:00 - 12:00", color: "#FF383C" }],
-  "2026-06-10": [{ id: 101, title: "Pameran Buku by Gramedia", location: "Lapangan Basket UC Makassar", time: "15:00 - 22:00", color: "#FF383C" }],
-  "2026-06-15": [{ id: 102, title: "Mayora Goes to Campus", location: "Classroom A606", time: "11:00 - 16:00", color: "#FF383C" }],
-};
 
 export default function Dashboard() {
   const router = useRouter();
@@ -46,28 +42,64 @@ export default function Dashboard() {
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(getTodayStr());
-  const [events, setEvents] = useState<EventData>(MOCK_EVENTS);
+  const [events, setEvents] = useState<EventData>({});
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string; role?: string } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [tempMonth, setTempMonth] = useState(currentDate.getMonth());
   const [tempYear, setTempYear] = useState(currentDate.getFullYear());
 
-  const STORAGE_KEY = 'MANAPP_EVENTS';
-  const CHECKLIST_KEY = 'CHECKLIST_DATA';
   const PROFILE_IMAGE_KEY = 'USER_PROFILE_IMAGE'; 
   const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/bottts/png?seed=Ginger&backgroundColor=fef2db';
   const todayStr = getTodayStr();
 
-  const getStatusColor = (statusArray: string[]) => {
-    if (!statusArray || statusArray.length === 0) return "#FF383C";
-    const allSelesai = statusArray.every(status => status === 'selesai');
-    const hasRevisi = statusArray.some(status => status === 'revisi');
-    const hasSelesai = statusArray.some(status => status === 'selesai');
-    const hasBelum = statusArray.some(status => status === 'belum');
+  const getEventDate = (event: any) => {
+    const start = event?.start_time || '';
+    return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+  };
+
+  const getEventTime = (event: any) => {
+    const start = event?.start_time || '';
+    const end = event?.end_time || '';
+    const startTime = start.includes('T') ? start.split('T')[1]?.slice(0, 5) : start.split(' ')[1]?.slice(0, 5);
+    const endTime = end.includes('T') ? end.split('T')[1]?.slice(0, 5) : end.split(' ')[1]?.slice(0, 5);
+    if (startTime && endTime) return `${startTime} - ${endTime}`;
+    return startTime || endTime || '';
+  };
+
+  const toSnake = (value: string) => value.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+
+  const getStatusColor = (file: any) => {
+    const statusKeys = [
+      'statusFormChecklistSebelumAcara',
+      'statusSuratPerjanjianKerjasama',
+      'statusInvoice',
+      'statusLembarDisposisi',
+      'statusSuratIzinLoading',
+      'statusFormChecklistSetelahAcara',
+    ];
+    const docKeys = [
+      'form_checklist_sebelum_acara',
+      'surat_perjanjian_kerjasama',
+      'invoice',
+      'lembar_disposisi',
+      'surat_izin_loading',
+      'form_checklist_setelah_acara',
+    ];
+
+    const statusCodes = statusKeys.map((key, index) => {
+      const resolved = file?.[key] ?? file?.[toSnake(key)];
+      if (resolved?.code) return resolved.code;
+      if (file?.[docKeys[index]]) return 'S';
+      return 'B';
+    });
+
+    const allSelesai = statusCodes.every(code => code === 'S');
+    const allBelum = statusCodes.every(code => code === 'B');
+
     if (allSelesai) return "#606C38";
-    if (hasRevisi || (hasSelesai && hasBelum)) return "#EA9B03";
-    return "#FF383C";
+    if (allBelum) return "#FF383C";
+    return "#EA9B03";
   };
 
   // --- REFRESH DATA SAAT HALAMAN DIFOKUSKAN ---
@@ -93,29 +125,32 @@ export default function Dashboard() {
 
   const loadEvents = async () => {
     try {
-      const savedEvents = await AsyncStorage.getItem(STORAGE_KEY);
-      const savedChecklists = await AsyncStorage.getItem(CHECKLIST_KEY);
-      let checklistMap = savedChecklists ? JSON.parse(savedChecklists) : {};
-      let mergedEvents: EventData = { ...MOCK_EVENTS };
-      
-      if (savedEvents) {
-        const stored: EventData = JSON.parse(savedEvents);
-        Object.entries(stored).forEach(([date, items]) => {
-          const existing = mergedEvents[date] || [];
-          const existingIds = new Set(existing.map(e => e.id));
-          const newItems = items.filter(item => !existingIds.has(item.id));
-          mergedEvents[date] = [...existing, ...newItems];
-        });
-      }
+      const [eventsData, filesData] = await Promise.all([fetchEvents(), fetchFiles()]);
+      const mergedEvents: EventData = {};
 
-      Object.keys(mergedEvents).forEach(date => {
-        mergedEvents[date] = mergedEvents[date].map(event => {
-          const statusArray = checklistMap[event.title] || EVENT_STATUS_CONFIG[event.title] || ["belum"];
-          return { ...event, color: getStatusColor(statusArray) };
-        });
+      eventsData.forEach((event: any) => {
+        const date = getEventDate(event);
+        const time = getEventTime(event);
+        const file = filesData.find((item: any) => String(item.event_id) === String(event.id));
+        const color = getStatusColor(file);
+
+        const item: EventItem = {
+          id: event.id,
+          title: event.name,
+          location: event.location,
+          time,
+          date,
+          color,
+          pic: event?.user?.name,
+        };
+
+        mergedEvents[date] = [...(mergedEvents[date] || []), item];
       });
+
       setEvents(mergedEvents);
-    } catch (error) { setEvents(MOCK_EVENTS); }
+    } catch (error) {
+      setEvents({});
+    }
   };
 
   const changeMonth = (offset: number) => {
@@ -238,8 +273,17 @@ export default function Dashboard() {
             key={`${selectedDate}-${event.id}`} 
             style={eventStyles.card} 
             onPress={() => {
-              const matched = EVENT_DATA.find(e => normalizeName(e.name) === normalizeName(event.title));
-              router.push({ pathname: '/checklist', params: { eventName: event.title, eventDate: selectedDate, source: 'dashboard', location: event.location || matched?.location, pic: matched?.pic } });
+              router.push({
+                pathname: '/checklist',
+                params: {
+                  eventName: event.title,
+                  eventDate: selectedDate,
+                  eventId: event.id,
+                  source: 'dashboard',
+                  location: event.location,
+                  pic: event.pic,
+                }
+              });
             }}
           >
             <View style={eventStyles.content}>

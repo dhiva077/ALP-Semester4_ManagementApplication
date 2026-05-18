@@ -15,6 +15,8 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
+import { createEvent } from '../../src/services/eventService';
+import { uploadEventPdf } from '../../src/services/fileApi';
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const YEARS = Array.from({ length: 31 }, (_, i) => 2020 + i);
@@ -43,6 +45,8 @@ export default function TambahEvent() {
   const [endTime, setEndTime] = useState('');
   const [description, setDescription] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Modal States
   const [showDateModal, setShowDateModal] = useState(false);
@@ -54,7 +58,7 @@ export default function TambahEvent() {
   const [tempYear, setTempYear] = useState(new Date().getFullYear());
 
   const resetForm = () => {
-    setPicName('');
+    setPicName(currentUser?.name || '');
     setEventName('');
     setEventDate('');
     setLocation('');
@@ -71,9 +75,28 @@ export default function TambahEvent() {
     }, [])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      const loadUser = async () => {
+        try {
+          const savedUser = await AsyncStorage.getItem('user');
+          if (savedUser) {
+            const parsed = JSON.parse(savedUser);
+            setCurrentUser(parsed);
+            setPicName(parsed?.name || '');
+          }
+        } catch (error) {
+          console.error('Failed to load user:', error);
+        }
+      };
+
+      loadUser();
+    }, [])
+  );
+
   const handlePickDocument = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: "*/*", multiple: true });
+      const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", multiple: true });
       if (!result.canceled) {
         const newFiles = result.assets.map(asset => ({ name: asset.name, uri: asset.uri }));
         setSelectedFiles(prev => [...prev, ...newFiles]);
@@ -90,30 +113,66 @@ export default function TambahEvent() {
     setShowPicker(false);
   };
 
+  const normalizeName = (value: string) => value.trim().toLowerCase();
+
+  const combineDateTime = (date: string, time: string) => {
+    return `${date} ${time}:00`;
+  };
+
   const validateAndSave = async () => {
-    if (!picName || !eventName || !location || !startTime || !eventDate) {
+    if (!picName || !eventName || !location || !startTime || !endTime || !eventDate) {
       Alert.alert('Perhatian', 'Mohon lengkapi kolom wajib.');
       return;
     }
-    const newEvent = {
-      id: Date.now(),
-      title: eventName,
-      location,
-      time: endTime ? `${startTime} - ${endTime}` : startTime,
-      color: "#FF8C00",
-      picName,
-      description,
-      files: selectedFiles,
-    };
+
+    if (!currentUser?.id) {
+      Alert.alert('Perhatian', 'User belum terautentikasi. Silakan login ulang.');
+      return;
+    }
+
     try {
-      const stored = await AsyncStorage.getItem('MANAPP_EVENTS');
-      const savedEvents = stored ? JSON.parse(stored) : {};
-      savedEvents[eventDate] = [...(savedEvents[eventDate] || []), newEvent];
-      await AsyncStorage.setItem('MANAPP_EVENTS', JSON.stringify(savedEvents));
-      
+      if (selectedFiles.length > 0) {
+        const eventKeyword = normalizeName(eventName);
+        const invalidFile = selectedFiles.find((file) => !normalizeName(file.name).includes(eventKeyword));
+        if (invalidFile) {
+          Alert.alert('Gagal', `Nama file harus mengandung kata: "${eventName}"`);
+          return;
+        }
+      }
+
+      setIsSubmitting(true);
+
+      const payload = {
+        user_id: currentUser.id,
+        name: eventName,
+        description: description || null,
+        start_time: combineDateTime(eventDate, startTime),
+        end_time: combineDateTime(eventDate, endTime),
+        location,
+        status_id: 1,
+      };
+
+      const response = await createEvent(payload);
+      const createdEvent = response?.event || response;
+
+      if (!createdEvent?.id) {
+        throw new Error('Event gagal dibuat.');
+      }
+
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          await uploadEventPdf(createdEvent.id, file.uri, file.name);
+        }
+      }
+
       Alert.alert('Sukses', 'Event berhasil ditambahkan.');
       resetForm();
-    } catch (error) { Alert.alert('Gagal', 'Terjadi masalah penyimpanan.'); }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Terjadi masalah penyimpanan.';
+      Alert.alert('Gagal', msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderCalendarDays = () => {
@@ -219,7 +278,7 @@ export default function TambahEvent() {
 
         {/* File criteria text removed as requested */}
 
-        <TouchableOpacity style={styles.btnSimpan} onPress={validateAndSave}>
+        <TouchableOpacity style={[styles.btnSimpan, isSubmitting && { opacity: 0.6 }]} onPress={validateAndSave} disabled={isSubmitting}>
           <Text style={styles.btnText}>Simpan Event</Text>
         </TouchableOpacity>
       </ScrollView>

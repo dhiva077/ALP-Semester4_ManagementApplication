@@ -11,6 +11,8 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::post('login', [UserController::class, 'login']);
+Route::post('files/upload', [FileController::class, 'upload']);
+Route::patch('files/status', [FileController::class, 'updateStatus']);
 Route::apiResource('users', UserController::class);
 Route::apiResource('events', EventController::class);
 Route::apiResource('files', FileController::class);

@@ -9,22 +9,16 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { fetchEvents } from '../../src/services/eventService';
+import { fetchFiles } from '../../src/services/fileApi';
 
 interface EventItem { id: number; title: string; location: string; time: string; color: string; date: string; }
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
-
-const EVENT_STATUS_CONFIG: Record<string, string[]> = {
-  "Meeting Koordinasi": ["belum", "belum", "belum", "belum", "belum", "belum"],
-  "Wisuda Santri TK/TPA Barokah": ["selesai", "selesai", "selesai", "selesai", "selesai", "selesai"],
-  "Pameran Buku by Gramedia": ["selesai", "revisi", "selesai", "belum", "selesai", "belum"],
-  "Mayora Goes to Campus": ["selesai", "selesai", "revisi", "revisi", "belum", "belum"],
-};
 
 export default function Penyimpanan() {
   const router = useRouter();
@@ -38,37 +32,74 @@ export default function Penyimpanan() {
   const [tempMonth, setTempMonth] = useState(currentMonth);
   const [tempYear, setTempYear] = useState(currentYear);
 
-  const STORAGE_KEY = 'MANAPP_EVENTS';
-  const CHECKLIST_KEY = 'CHECKLIST_DATA';
+  const getEventDate = (event: any) => {
+    const start = event?.start_time || '';
+    return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+  };
 
-  const getStatusColor = (statusArray: string[]) => {
-    if (!statusArray || statusArray.length === 0) return "#FF383C";
-    const allSelesai = statusArray.every(s => s === 'selesai');
-    const hasRevisi = statusArray.some(s => s === 'revisi');
-    const hasSelesai = statusArray.some(s => s === 'selesai');
-    const hasBelum = statusArray.some(s => s === 'belum');
+  const getEventTime = (event: any) => {
+    const start = event?.start_time || '';
+    const end = event?.end_time || '';
+    const startTime = start.includes('T') ? start.split('T')[1]?.slice(0, 5) : start.split(' ')[1]?.slice(0, 5);
+    const endTime = end.includes('T') ? end.split('T')[1]?.slice(0, 5) : end.split(' ')[1]?.slice(0, 5);
+    if (startTime && endTime) return `${startTime} - ${endTime}`;
+    return startTime || endTime || '';
+  };
+
+  const toSnake = (value: string) => value.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+
+  const getStatusColor = (file: any) => {
+    const statusKeys = [
+      'statusFormChecklistSebelumAcara',
+      'statusSuratPerjanjianKerjasama',
+      'statusInvoice',
+      'statusLembarDisposisi',
+      'statusSuratIzinLoading',
+      'statusFormChecklistSetelahAcara',
+    ];
+    const docKeys = [
+      'form_checklist_sebelum_acara',
+      'surat_perjanjian_kerjasama',
+      'invoice',
+      'lembar_disposisi',
+      'surat_izin_loading',
+      'form_checklist_setelah_acara',
+    ];
+
+    const statusCodes = statusKeys.map((key, index) => {
+      const resolved = file?.[key] ?? file?.[toSnake(key)];
+      if (resolved?.code) return resolved.code;
+      if (file?.[docKeys[index]]) return 'S';
+      return 'B';
+    });
+    const allSelesai = statusCodes.every(code => code === 'S');
+    const allBelum = statusCodes.every(code => code === 'B');
+
     if (allSelesai) return "#606C38";
-    if (hasRevisi || (hasSelesai && hasBelum)) return "#EA9B03";
-    return "#FF383C";
+    if (allBelum) return "#FF383C";
+    return "#EA9B03";
   };
 
   const loadData = async () => {
     try {
-      const savedEvents = await AsyncStorage.getItem(STORAGE_KEY);
-      const savedChecklists = await AsyncStorage.getItem(CHECKLIST_KEY);
-      let checklistData = savedChecklists ? JSON.parse(savedChecklists) : {};
+      const [eventsData, filesData] = await Promise.all([fetchEvents(), fetchFiles()]);
 
-      let allEvents: EventItem[] = [];
-      if (savedEvents) {
-        const stored: Record<string, EventItem[]> = JSON.parse(savedEvents);
-        Object.entries(stored).forEach(([date, items]) => {
-          items.forEach(item => { 
-            const statusArray = checklistData[item.title] || EVENT_STATUS_CONFIG[item.title] || ["belum"];
-            const color = getStatusColor(statusArray);
-            allEvents.push({ ...item, date, color }); 
-          });
-        });
-      }
+      const allEvents: EventItem[] = eventsData.map((event: any) => {
+        const date = getEventDate(event);
+        const time = getEventTime(event);
+        const file = filesData.find((item: any) => String(item.event_id) === String(event.id));
+        const color = getStatusColor(file);
+
+        return {
+          id: event.id,
+          title: event.name,
+          location: event.location,
+          time,
+          date,
+          color,
+        };
+      });
+
       setEvents(allEvents);
     } catch (error) {
       console.error(error);
@@ -149,7 +180,7 @@ export default function Penyimpanan() {
               style={styles.eventCard}
               onPress={() => router.push({
                 pathname: '/checklist',
-                params: { eventName: item.title, eventDate: item.date, source: 'penyimpanan' }
+                params: { eventName: item.title, eventDate: item.date, eventId: item.id, source: 'penyimpanan' }
               })}
             >
               <View style={styles.cardInfo}>
@@ -174,7 +205,7 @@ export default function Penyimpanan() {
             <Text style={styles.emptyText}>
               {searchQuery ? (
                 <Text>
-                  "<Text style={{ fontWeight: 'bold' }}>{searchQuery}</Text>" tidak ditemukan
+                  {'"'}<Text style={{ fontWeight: 'bold' }}>{searchQuery}</Text>{'"'} tidak ditemukan
                 </Text>
               ) : (
                 "Tidak ada data di periode ini"

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import useInputFileViewModel from '../../src/viewmodels/useInputFileViewModel';
-import { EVENT_DATA, normalizeName } from '../../src/data/events';
+import { fetchEvents } from '../../src/services/eventService';
+import { uploadEventPdf } from '../../src/services/fileApi';
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const YEARS = ["2024", "2025", "2026", "2027"];
@@ -23,16 +24,16 @@ export default function InputFile() {
   
   const eventName = typeof params.eventName === 'string' ? params.eventName : null;
   const eventDate = typeof params.eventDate === 'string' ? params.eventDate : null;
-  const docTitle = typeof params.title === 'string' ? params.title : null;
-  
-  const fromChecklist = params.fromChecklist === 'true';
+  const fromChecklist = !!params.source;
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [events, setEvents] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [monthModal, setMonthModal] = useState(false);
   const [yearModal, setYearModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean;
@@ -42,7 +43,27 @@ export default function InputFile() {
     onClose?: () => void;
   }>({ visible: false, type: 'success', title: '', message: '' });
 
-  const { selectedFiles, handlePickFile, removeFile } = useInputFileViewModel();
+  const { selectedFiles, handlePickFile, removeFile, removeFileByUri, clearAllFiles } = useInputFileViewModel();
+
+  const normalizeName = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string, onClose?: () => void) => {
+    setAlertConfig({ visible: true, type, title, message, onClose });
+  };
+
+  const mapEvent = (event: any) => {
+    const start = event?.start_time || '';
+    const dateOnly = start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+    return {
+      id: event.id,
+      name: event.name,
+      date: dateOnly,
+      location: event.location,
+      pic: event?.user?.name ?? 'PIC',
+      start_time: event.start_time,
+      end_time: event.end_time,
+    };
+  };
 
   // MEKANISME RESET UTAMA:
   // Hanya mendeteksi jika parameter rute berubah kosong / null (user masuk dari tab Navbar utama)
@@ -57,22 +78,37 @@ export default function InputFile() {
       setAlertConfig({ visible: false, type: 'success', title: '', message: '' });
       
       if (selectedFiles && selectedFiles.length > 0) {
-        selectedFiles.forEach(() => removeFile(0));
+        clearAllFiles();
       }
     }
   }, [eventName]);
 
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const data = await fetchEvents();
+        const mapped = data.map(mapEvent);
+        setEvents(mapped);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Gagal mengambil data event.';
+        showAlert('error', 'Error', msg);
+      }
+    };
+
+    loadEvents();
+  }, []);
+
   // Memasang data event otomatis jika dilempar melalui parameter halaman (dari checklist)
   useEffect(() => {
     if (eventName) {
-      let found = EVENT_DATA.find(e => normalizeName(e.name) === normalizeName(eventName));
+      let found = events.find(e => normalizeName(e.name) === normalizeName(eventName));
 
       if (!found && eventDate) {
-        found = EVENT_DATA.find(e => e.date === eventDate);
+        found = events.find(e => e.date === eventDate);
       }
 
       if (!found && eventName !== "Detail Event") {
-        found = EVENT_DATA.find(e => 
+        found = events.find(e =>
           normalizeName(e.name).includes(normalizeName(eventName)) ||
           normalizeName(eventName).includes(normalizeName(e.name))
         );
@@ -88,14 +124,15 @@ export default function InputFile() {
       } else {
         const safeLocation = params.location && params.location !== 'Lokasi tidak ditemukan' ? params.location : 'Dian Auditorium';
         const safePic = params.pic && params.pic !== 'Petugas' ? params.pic : 'Fathir';
-        
+
         setSelectedEvent({
+          id: params.eventId ? Number(params.eventId) : undefined,
           name: eventName === "Detail Event" ? "Event Pilihan" : eventName,
           date: eventDate || '2026-05-20',
           location: safeLocation,
-          pic: safePic
+          pic: safePic,
         });
-        
+
         if (eventDate) {
           const d = new Date(eventDate);
           if (!isNaN(d.getTime())) {
@@ -105,18 +142,14 @@ export default function InputFile() {
         }
       }
     }
-  }, [eventName, eventDate, params.location, params.pic]);
+  }, [eventName, eventDate, events, params.location, params.pic, params.eventId]);
 
   const filteredEvents = useMemo(() => {
-    return EVENT_DATA.filter(event => {
+    return events.filter(event => {
       const dateObj = new Date(event.date);
       return dateObj.getMonth() === selectedMonth && dateObj.getFullYear().toString() === selectedYear;
     });
-  }, [selectedMonth, selectedYear]);
-
-  const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string, onClose?: () => void) => {
-    setAlertConfig({ visible: true, type, title, message, onClose });
-  };
+  }, [events, selectedMonth, selectedYear]);
 
   const handleBackNavigation = () => {
     if (fromChecklist) {
@@ -126,7 +159,8 @@ export default function InputFile() {
           eventName: eventName,
           eventDate: eventDate,
           location: params.location,
-          pic: params.pic
+          pic: params.pic,
+          eventId: params.eventId,
         }
       });
     } else {
@@ -141,25 +175,51 @@ export default function InputFile() {
     }
     
     // Membuka file picker lokal perangkat (Data Event dijamin tetap melekat dan aman)
-    const result = (await handlePickFile() as unknown) as any[];
+    const result = await handlePickFile();
     if (!result || result.length === 0) return;
 
     const eventKeyword = selectedEvent.name.toLowerCase();
-    const lastPickedFile = result[result.length - 1];
-    const fileName = lastPickedFile?.name?.toLowerCase() || "";
-    
-    if (!fileName.includes(eventKeyword)) {
-      removeFile(result.length - 1);
+    let hasInvalid = false;
+
+    result.forEach((picked) => {
+      const fileName = picked?.name?.toLowerCase() || '';
+      if (!fileName.includes(eventKeyword)) {
+        removeFileByUri(picked.uri);
+        hasInvalid = true;
+      }
+    });
+
+    if (hasInvalid) {
       showAlert('error', 'File Tertolak', `Nama file harus mengandung kata: "${selectedEvent.name}"`);
     }
   };
 
-  const handleFinalUpload = () => {
+  const handleFinalUpload = async () => {
     if (selectedFiles.length === 0) {
       showAlert('warning', 'Berkas Kosong', 'Pilih file terlebih dahulu.');
       return;
     }
-    showAlert('success', 'Berhasil', 'Berkas berhasil diunggah!', () => handleBackNavigation());
+
+    if (!selectedEvent?.id) {
+      showAlert('error', 'Event Tidak Valid', 'Event belum memiliki ID dari server.');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+
+      for (const file of selectedFiles) {
+        await uploadEventPdf(selectedEvent.id, file.uri, file.name);
+      }
+
+      clearAllFiles();
+      showAlert('success', 'Berhasil', 'Berkas berhasil diunggah!', () => handleBackNavigation());
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Gagal upload berkas.';
+      showAlert('error', 'Gagal', msg);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const renderPickerModal = (visible: boolean, data: string[], onSelect: (val: any, index?: number) => void, onClose: () => void, title: string) => (
@@ -271,7 +331,7 @@ export default function InputFile() {
           )}
         </View>
 
-        {selectedEvent && (
+          {selectedEvent && (
           <View style={styles.infoCard}>
             <View style={styles.infoRow}><MaterialCommunityIcons name="account-tie" size={18} color="#8D6E63" /><Text style={styles.infoValue}>PIC: {selectedEvent.pic}</Text></View>
             <View style={styles.infoRow}><Ionicons name="location-outline" size={18} color="#8D6E63" /><Text style={styles.infoValue}>{selectedEvent.location}</Text></View>
@@ -299,8 +359,9 @@ export default function InputFile() {
 
         <TouchableOpacity 
           activeOpacity={0.8}
-          style={[styles.btnSimpan, (selectedFiles.length === 0 || !selectedEvent) && { opacity: 0.5 }]}
+          style={[styles.btnSimpan, (selectedFiles.length === 0 || !selectedEvent || isUploading) && { opacity: 0.5 }]}
           onPress={handleFinalUpload}
+          disabled={isUploading}
         >
           <Text style={styles.btnText}>Upload & Auto Mapping</Text>
         </TouchableOpacity>
