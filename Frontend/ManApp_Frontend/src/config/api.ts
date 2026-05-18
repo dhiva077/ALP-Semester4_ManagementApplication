@@ -1,38 +1,28 @@
-import { Platform } from 'react-native';
-
 /**
- * API Configuration yang mendukung berbagai environment
- * 
- * - Web: http://localhost:8000
- * - Physical Android/iOS Device: http://192.168.1.16:8000 (IP lokal PC)
- * - Android Emulator: http://10.0.2.2:8000 (special address untuk localhost)
+ * Centralized API Configuration
+ *
+ * Auto-detects the host machine running Expo dev server so you
+ * do not need to update IPs manually. Falls back to localhost
+ * when the dev host is unavailable.
  */
+import Constants from 'expo-constants';
 
-// IP lokal PC Anda - ubah sesuai kebutuhan
-const LOCAL_PC_IP = '10.1.51.9';
 const PORT = '8000';
 
-let API_BASE_URL: string;
+const getDevHost = () => {
+  const hostUri = Constants.expoConfig?.hostUri || Constants.manifest2?.extra?.expoGo?.debuggerHost;
+  if (!hostUri) return null;
+  return hostUri.split(':')[0];
+};
 
-if (Platform.OS === 'web') {
-  // Web: gunakan localhost
-  API_BASE_URL = `http://localhost:${PORT}/api`;
-} else if (Platform.OS === 'android' || Platform.OS === 'ios') {
-  // Mobile: cek apakah emulator atau physical device
-  // Default ke physical device, bisa diubah manual di sini
-  API_BASE_URL = `http://${LOCAL_PC_IP}:${PORT}/api`;
-  
-  // Kalau pakai Android Emulator, uncomment line di bawah:
-  // API_BASE_URL = `http://10.0.2.2:${PORT}/api`;
-} else {
-  // Default fallback
-  API_BASE_URL = `http://${LOCAL_PC_IP}:${PORT}/api`;
-}
+const DEV_HOST = getDevHost();
+
+export const API_URL = `http://${DEV_HOST || 'localhost'}:${PORT}/api`;
 
 export const API_CONFIG = {
-  BASE_URL: API_BASE_URL,
+  BASE_URL: API_URL,
   PORT,
-  LOCAL_PC_IP,
+  DEV_HOST,
 };
 
 export default API_CONFIG;
