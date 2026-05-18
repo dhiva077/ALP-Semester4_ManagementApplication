@@ -98,4 +98,16 @@ class UserController extends Controller
 
         return response()->noContent();
     }
+
+    public function savePushToken(Request $request)
+    {
+        $request->validate([
+            'token' => 'required|string'
+        ]);
+
+        $user = $request->user();
+        $user->update(['expo_push_token' => $request->token]);
+
+        return response()->json(['message' => 'Token saved successfully.']);
+    }
 }

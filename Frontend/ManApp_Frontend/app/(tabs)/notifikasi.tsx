@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { fetchEvents } from "../../src/services/eventService";
+import * as Notifications from 'expo-notifications';
 
 interface NotificationItem {
   id: number;
@@ -91,6 +92,21 @@ export default function Notifikasi() {
     }, []),
   );
 
+  const testPushNotification = async () => {
+    // Schedule a local notification to simulate a push notification 2 seconds after button press
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Peringatan! ⚠️",
+        body: "Ayo buruan dicek, masih ada file yang perlu diperhatikan.",
+        sound: true,
+      },
+      trigger: {
+        seconds: 2, 
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL
+      },
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -101,7 +117,9 @@ export default function Notifikasi() {
           <Ionicons name="chevron-back" size={28} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifikasi</Text>
-        <View style={styles.spacer} />
+        <TouchableOpacity onPress={testPushNotification} style={styles.testNotifButton}>
+           <Ionicons name="notifications" size={24} color="#FFF" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -186,8 +204,14 @@ const styles = StyleSheet.create({
     color: "#5D4037",
   },
 
-  spacer: {
+  testNotifButton: {
     width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: "#FF8C2B", // Orange accent color for the test button
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4,
   },
 
   scrollContent: {
