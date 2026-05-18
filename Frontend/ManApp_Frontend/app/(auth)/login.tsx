@@ -107,6 +107,14 @@ export default function Login() {
 
     try {
       const backendUser = await googleSignInService({ email: normalizedEmail, name: user.name });
+      
+      try {
+        const { registerForPushNotificationsAsync } = require('../../src/services/notificationService');
+        await registerForPushNotificationsAsync();
+      } catch (pushErr) {
+        console.log('Failed to register push token:', pushErr);
+      }
+
       setGoogleAuthInProgress(false);
       router.replace('/(tabs)/dashboard');
     } catch (err) {

@@ -71,6 +71,13 @@ export default function useLoginViewModel() {
         ['user', JSON.stringify(userData)],
       ]);
 
+      try {
+        const { registerForPushNotificationsAsync } = require('../services/notificationService');
+        await registerForPushNotificationsAsync();
+      } catch (pushErr) {
+        console.log('Failed to register push token:', pushErr);
+      }
+
       router.replace('/(tabs)/dashboard');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Login gagal';
