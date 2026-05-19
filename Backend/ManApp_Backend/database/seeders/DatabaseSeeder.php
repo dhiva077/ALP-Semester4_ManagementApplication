@@ -52,7 +52,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'Selesai',
         ]);
 
-        $this->call(EventSeeder::class);
-        $this->call(FileSeeder::class);
+        #$this->call(EventSeeder::class);
+        #$this->call(FileSeeder::class);
     }
 }

@@ -37,11 +37,24 @@ export default function Penyimpanan() {
     return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
   };
 
+  const parseEventTime = (value?: string) => {
+    if (!value) return null;
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const formatTime = (date: Date) => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   const getEventTime = (event: any) => {
-    const start = event?.start_time || '';
-    const end = event?.end_time || '';
-    const startTime = start.includes('T') ? start.split('T')[1]?.slice(0, 5) : start.split(' ')[1]?.slice(0, 5);
-    const endTime = end.includes('T') ? end.split('T')[1]?.slice(0, 5) : end.split(' ')[1]?.slice(0, 5);
+    const startDate = parseEventTime(event?.start_time);
+    const endDate = parseEventTime(event?.end_time);
+    const startTime = startDate ? formatTime(startDate) : '';
+    const endTime = endDate ? formatTime(endDate) : '';
     if (startTime && endTime) return `${startTime} - ${endTime}`;
     return startTime || endTime || '';
   };

@@ -15,6 +15,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { createEvent } from '../../src/services/eventService';
 import { uploadEventPdf } from '../../src/services/fileApi';
 
@@ -43,6 +44,8 @@ export default function TambahEvent() {
   const [location, setLocation] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [startTimeValue, setStartTimeValue] = useState<Date | null>(null);
+  const [endTimeValue, setEndTimeValue] = useState<Date | null>(null);
   const [description, setDescription] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -52,10 +55,14 @@ export default function TambahEvent() {
   const [showDateModal, setShowDateModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [tempMonth, setTempMonth] = useState(new Date().getMonth());
   const [tempYear, setTempYear] = useState(new Date().getFullYear());
+  const [tempStartTime, setTempStartTime] = useState(new Date());
+  const [tempEndTime, setTempEndTime] = useState(new Date());
 
   const resetForm = () => {
     setPicName(currentUser?.name || '');
@@ -64,6 +71,8 @@ export default function TambahEvent() {
     setLocation('');
     setStartTime('');
     setEndTime('');
+    setStartTimeValue(null);
+    setEndTimeValue(null);
     setDescription('');
     setSelectedFiles([]);
     setCalendarDate(new Date());
@@ -113,7 +122,11 @@ export default function TambahEvent() {
     setShowPicker(false);
   };
 
-  const normalizeName = (value: string) => value.trim().toLowerCase();
+  const formatTime = (date: Date) => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
 
   const combineDateTime = (date: string, time: string) => {
     return `${date} ${time}:00`;
@@ -131,15 +144,6 @@ export default function TambahEvent() {
     }
 
     try {
-      if (selectedFiles.length > 0) {
-        const eventKeyword = normalizeName(eventName);
-        const invalidFile = selectedFiles.find((file) => !normalizeName(file.name).includes(eventKeyword));
-        if (invalidFile) {
-          Alert.alert('Gagal', `Nama file harus mengandung kata: "${eventName}"`);
-          return;
-        }
-      }
-
       setIsSubmitting(true);
 
       const payload = {
@@ -236,15 +240,31 @@ export default function TambahEvent() {
         </TouchableOpacity>
 
         <View style={styles.timeRow}>
-          <View style={[styles.inputContainer, { flex: 1 }]}>
+          <TouchableOpacity
+            style={[styles.inputContainer, { flex: 1 }]}
+            onPress={() => {
+              setTempStartTime(startTimeValue || new Date());
+              setShowStartTimePicker(true);
+            }}
+          >
             <Ionicons name="time-outline" size={20} color="#8D6E63" style={styles.icon} />
-            <TextInput value={startTime} onChangeText={setStartTime} placeholder="Mulai" style={[styles.input, styles.boldText]} placeholderTextColor="#A1887F" />
-          </View>
+            <Text style={[styles.input, styles.boldText, !startTime && styles.placeholderText]}>
+              {startTime || 'Mulai'}
+            </Text>
+          </TouchableOpacity>
           <Text style={styles.dash}>-</Text>
-          <View style={[styles.inputContainer, { flex: 1 }]}>
+          <TouchableOpacity
+            style={[styles.inputContainer, { flex: 1 }]}
+            onPress={() => {
+              setTempEndTime(endTimeValue || new Date());
+              setShowEndTimePicker(true);
+            }}
+          >
             <Ionicons name="time-outline" size={20} color="#8D6E63" style={styles.icon} />
-            <TextInput value={endTime} onChangeText={setEndTime} placeholder="Selesai" style={[styles.input, styles.boldText]} placeholderTextColor="#A1887F" />
-          </View>
+            <Text style={[styles.input, styles.boldText, !endTime && styles.placeholderText]}>
+              {endTime || 'Selesai'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionLabel}>Detail & Berkas</Text>
@@ -381,6 +401,86 @@ export default function TambahEvent() {
               </TouchableOpacity>
             ))}
             <TouchableOpacity onPress={() => setShowLocationModal(false)} style={{marginTop: 15, alignSelf: 'center'}}><Text style={{color: '#FF8C00', fontWeight: 'bold'}}>Batal</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showStartTimePicker} transparent animationType="fade" onRequestClose={() => setShowStartTimePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerCard}>
+            <Text style={styles.timePickerTitle}>Pilih Jam Mulai</Text>
+            <DateTimePicker
+              value={tempStartTime}
+              mode="time"
+              is24Hour
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, selected) => {
+                if (Platform.OS !== 'ios') {
+                  setShowStartTimePicker(false);
+                  if (selected) {
+                    setStartTimeValue(selected);
+                    setStartTime(formatTime(selected));
+                  }
+                  return;
+                }
+                if (selected) setTempStartTime(selected);
+              }}
+            />
+            <View style={styles.timePickerActions}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowStartTimePicker(false)}>
+                <Text style={styles.btnSecondaryText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={() => {
+                  setShowStartTimePicker(false);
+                  setStartTimeValue(tempStartTime);
+                  setStartTime(formatTime(tempStartTime));
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>Pilih</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEndTimePicker} transparent animationType="fade" onRequestClose={() => setShowEndTimePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerCard}>
+            <Text style={styles.timePickerTitle}>Pilih Jam Selesai</Text>
+            <DateTimePicker
+              value={tempEndTime}
+              mode="time"
+              is24Hour
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, selected) => {
+                if (Platform.OS !== 'ios') {
+                  setShowEndTimePicker(false);
+                  if (selected) {
+                    setEndTimeValue(selected);
+                    setEndTime(formatTime(selected));
+                  }
+                  return;
+                }
+                if (selected) setTempEndTime(selected);
+              }}
+            />
+            <View style={styles.timePickerActions}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowEndTimePicker(false)}>
+                <Text style={styles.btnSecondaryText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={() => {
+                  setShowEndTimePicker(false);
+                  setEndTimeValue(tempEndTime);
+                  setEndTime(formatTime(tempEndTime));
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>Pilih</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -796,5 +896,27 @@ const styles = StyleSheet.create({
   optionText: {
     color: '#4E342E',
     fontSize: 15,
+  },
+
+  timePickerCard: {
+    width: '85%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 10,
+  },
+
+  timePickerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4E342E',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+
+  timePickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 10,
   },
 });

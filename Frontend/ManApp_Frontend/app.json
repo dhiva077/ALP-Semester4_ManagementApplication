@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.uc.manapp",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -39,11 +40,23 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "googleOauth": {
+        "androidClientId": "520666620714-g171aetokau2lj8nm9rb2i5pjg5eaktt.apps.googleusercontent.com",
+        "webClientId": "520666620714-ckgbal9fel0nnonbgb0df9c0n3sutn4p.apps.googleusercontent.com",
+        "expoClientId": "zzz.apps.googleusercontent.com"
+      },
+      "router": {},
+      "eas": {
+        "projectId": "1d842911-c9d8-49b6-b3fb-278ed35dc7a8"
+      }
     }
   }
 }

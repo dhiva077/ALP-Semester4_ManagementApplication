@@ -12,7 +12,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Linking from 'expo-linking';
-import { buildFileUrl, updateFileStatus, uploadEventPdf } from '../../src/services/fileApi';
+import { buildFileUrl, fetchFiles, updateFileStatus, uploadEventPdf } from '../../src/services/fileApi';
 
 export default function FileDetail() {
   const router = useRouter();
@@ -41,6 +41,26 @@ export default function FileDetail() {
     loadCurrentUser();
   }, []);
 
+  useEffect(() => {
+    const loadLatestFile = async () => {
+      if (!eventId || !docKey) return;
+      try {
+        const files = await fetchFiles();
+        const record = files.find((item: any) => String(item.event_id) === String(eventId));
+        if (!record) return;
+
+        const pathValue = record?.[String(docKey)] || null;
+        const urlValue = record?.[`${String(docKey)}_url`] || null;
+        const resolved = urlValue || buildFileUrl(pathValue);
+        if (resolved) setCurrentFileUri(resolved);
+      } catch (error) {
+        console.error('Failed to refresh file detail:', error);
+      }
+    };
+
+    loadLatestFile();
+  }, [eventId, docKey]);
+
   // Fungsi navigasi balik ke page Checklist dengan membawa parameter state data event asal
   const handleBackToChecklist = () => {
     router.replace({
@@ -64,12 +84,20 @@ export default function FileDetail() {
         }
 
         setIsSubmitting(true);
-        const uploaded = await uploadEventPdf(Number(eventId), result.assets[0].uri, result.assets[0].name);
+        const uploaded = await uploadEventPdf(
+          Number(eventId),
+          result.assets[0].uri,
+          result.assets[0].name,
+          String(docKey)
+        );
         const newUrl = buildFileUrl(uploaded?.path) || result.assets[0].uri;
         setCurrentFileUri(newUrl);
         Alert.alert("Berhasil", "File berhasil diganti.");
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal mengganti file.';
+      Alert.alert('Gagal', msg);
+    }
     finally {
       setIsSubmitting(false);
     }

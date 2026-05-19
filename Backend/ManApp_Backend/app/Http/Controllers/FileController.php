@@ -145,13 +145,24 @@ class FileController extends Controller
 
     public function upload(Request $request)
     {
+        $allowedDocKeys = [
+            'form_checklist_sebelum_acara',
+            'surat_perjanjian_kerjasama',
+            'invoice',
+            'lembar_disposisi',
+            'surat_izin_loading',
+            'form_checklist_setelah_acara',
+        ];
+
         $validated = $request->validate([
             'event_id' => ['required', 'exists:events,id'],
             'pdf_file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'expected_doc_key' => ['nullable', 'string', 'in:' . implode(',', $allowedDocKeys)],
         ]);
 
         $eventId = $validated['event_id'];
         $pdfFile = $validated['pdf_file'];
+        $expectedDocKey = $validated['expected_doc_key'] ?? null;
 
         // Parse PDF using pure PHP
         $parser = new Parser();
@@ -159,11 +170,13 @@ class FileController extends Controller
         $text = $pdf->getText();
 
         $lowerText = strtolower($text);
+        $normalizedText = trim(preg_replace('/[^a-z0-9]+/i', ' ', $lowerText));
 
         $documentMappings = [
             'form_checklist_sebelum_acara' => [
                 'form_checklist_sebelum_acara',
                 'checklist sebelum',
+                'Checklist Sebelum Acara',
                 'sebelum acara',
                 'form checklist sebelum',
                 'pre-event',
@@ -177,6 +190,7 @@ class FileController extends Controller
             'surat_perjanjian_kerjasama'   => [
                 'surat_perjanjian_kerjasama',
                 'perjanjian kerjasama',
+                'Perjanjian Kerjasama',
                 'surat perjanjian',
                 'spk',
                 'mou',
@@ -191,6 +205,7 @@ class FileController extends Controller
             ],
             'invoice'                      => [
                 'invoice',
+                'Invoice',
                 'faktur',
                 'tagihan',
                 'receipt',
@@ -206,6 +221,7 @@ class FileController extends Controller
             'lembar_disposisi'             => [
                 'lembar_disposisi',
                 'lembar disposisi',
+                'Lembar Disposisi',
                 'disposisi',
                 'surat tugas',
                 'penugasan',
@@ -219,6 +235,7 @@ class FileController extends Controller
             ],
             'surat_izin_loading'           => [
                 'surat_izin_loading',
+                'Surat Izin Loading',
                 'izin loading',
                 'surat izin',
                 'loading',
@@ -235,6 +252,7 @@ class FileController extends Controller
             'form_checklist_setelah_acara' => [
                 'form_checklist_setelah_acara',
                 'checklist setelah',
+                'Checklist Setelah Acara',
                 'setelah acara',
                 'form checklist setelah',
                 'post-event',
@@ -249,19 +267,42 @@ class FileController extends Controller
         ];
 
         $type = null;
+        $sentences = preg_split('/[.!?\r\n]+/', $text) ?: [];
 
-        foreach ($documentMappings as $column => $keywords) {
-            foreach ($keywords as $keyword) {
-                if (str_contains($lowerText, $keyword)) {
-                    $type = $column;
-                    break 2;
+        foreach ($sentences as $sentence) {
+            $normalizedSentence = trim(preg_replace('/[^a-z0-9]+/i', ' ', strtolower($sentence)));
+            if ($normalizedSentence === '') {
+                continue;
+            }
+
+            foreach ($documentMappings as $column => $keywords) {
+                foreach ($keywords as $keyword) {
+                    $normalizedKeyword = strtolower(str_replace(['_', '-'], ' ', $keyword));
+                    $pattern = '/\b' . preg_quote($normalizedKeyword, '/') . '\b/i';
+                    if (preg_match($pattern, $normalizedSentence)) {
+                        $type = $column;
+                        break 3;
+                    }
                 }
             }
+        }
+
+        if (!$type && strlen($normalizedText) < 3) {
+            return response()->json([
+                'message' => 'PDF tidak terbaca atau teks terlalu sedikit.'
+            ], 400);
         }
 
         if (!$type) {
             return response()->json([
                 'message' => 'Jenis dokumen tidak dikenali.'
+            ], 400);
+        }
+
+        if ($expectedDocKey && $expectedDocKey !== $type) {
+            return response()->json([
+                'message' => 'Dokumen tidak sesuai dengan jenis yang dipilih.',
+                'detected_type' => $type,
             ], 400);
         }
 
