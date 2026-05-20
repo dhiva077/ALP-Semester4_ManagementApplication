@@ -175,23 +175,7 @@ export default function InputFile() {
     }
     
     // Membuka file picker lokal perangkat (Data Event dijamin tetap melekat dan aman)
-    const result = await handlePickFile();
-    if (!result || result.length === 0) return;
-
-    const eventKeyword = selectedEvent.name.toLowerCase();
-    let hasInvalid = false;
-
-    result.forEach((picked) => {
-      const fileName = picked?.name?.toLowerCase() || '';
-      if (!fileName.includes(eventKeyword)) {
-        removeFileByUri(picked.uri);
-        hasInvalid = true;
-      }
-    });
-
-    if (hasInvalid) {
-      showAlert('error', 'File Tertolak', `Nama file harus mengandung kata: "${selectedEvent.name}"`);
-    }
+    await handlePickFile();
   };
 
   const handleFinalUpload = async () => {
@@ -209,14 +193,17 @@ export default function InputFile() {
       setIsUploading(true);
 
       for (const file of selectedFiles) {
-        await uploadEventPdf(selectedEvent.id, file.uri, file.name);
+        try {
+          await uploadEventPdf(selectedEvent.id, file.uri, file.name);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Gagal upload berkas.';
+          showAlert('error', 'Gagal', `${file.name}: ${msg}`);
+          return;
+        }
       }
 
       clearAllFiles();
       showAlert('success', 'Berhasil', 'Berkas berhasil diunggah!', () => handleBackNavigation());
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Gagal upload berkas.';
-      showAlert('error', 'Gagal', msg);
     } finally {
       setIsUploading(false);
     }

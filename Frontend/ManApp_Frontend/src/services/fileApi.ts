@@ -9,7 +9,12 @@ export const fetchFiles = async () => {
   });
 };
 
-export const uploadEventPdf = async (eventId: number, fileUri: string, fileName: string) => {
+export const uploadEventPdf = async (
+  eventId: number,
+  fileUri: string,
+  fileName: string,
+  expectedDocKey?: string
+) => {
   const formData = new FormData();
   formData.append('event_id', String(eventId));
   formData.append('pdf_file', {
@@ -17,6 +22,9 @@ export const uploadEventPdf = async (eventId: number, fileUri: string, fileName:
     name: fileName || `upload-${Date.now()}.pdf`,
     type: 'application/pdf',
   } as any);
+  if (expectedDocKey) {
+    formData.append('expected_doc_key', expectedDocKey);
+  }
 
   const res = await fetchWithTimeout(`${API_BASE}/files/upload`, {
     method: 'POST',
