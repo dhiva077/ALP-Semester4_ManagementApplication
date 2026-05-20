@@ -222,7 +222,7 @@ export default function FileDetail() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FDF5E6',
+    backgroundColor: '#FEF2DB',
   },
 
   header: {

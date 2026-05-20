@@ -15,7 +15,6 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { createEvent } from '../../src/services/eventService';
 import { uploadEventPdf } from '../../src/services/fileApi';
 
@@ -42,10 +41,8 @@ export default function TambahEvent() {
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [location, setLocation] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [startTimeValue, setStartTimeValue] = useState<Date | null>(null);
-  const [endTimeValue, setEndTimeValue] = useState<Date | null>(null);
+  const [startTime, setStartTime] = useState('00:00');
+  const [endTime, setEndTime] = useState('00:00');
   const [description, setDescription] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -61,18 +58,21 @@ export default function TambahEvent() {
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [tempMonth, setTempMonth] = useState(new Date().getMonth());
   const [tempYear, setTempYear] = useState(new Date().getFullYear());
-  const [tempStartTime, setTempStartTime] = useState(new Date());
-  const [tempEndTime, setTempEndTime] = useState(new Date());
+  const [tempStartHour, setTempStartHour] = useState(0);
+  const [tempStartMinute, setTempStartMinute] = useState(0);
+  const [tempEndHour, setTempEndHour] = useState(0);
+  const [tempEndMinute, setTempEndMinute] = useState(0);
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 
   const resetForm = () => {
     setPicName(currentUser?.name || '');
     setEventName('');
     setEventDate('');
     setLocation('');
-    setStartTime('');
-    setEndTime('');
-    setStartTimeValue(null);
-    setEndTimeValue(null);
+    setStartTime('00:00');
+    setEndTime('00:00');
     setDescription('');
     setSelectedFiles([]);
     setCalendarDate(new Date());
@@ -122,10 +122,18 @@ export default function TambahEvent() {
     setShowPicker(false);
   };
 
-  const formatTime = (date: Date) => {
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
+  const formatTimeParts = (hour: number, minute: number) => {
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  };
+
+  const parseTimeParts = (value: string) => {
+    const [hourStr, minuteStr] = value.split(':');
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+    return {
+      hour: Number.isNaN(hour) ? 0 : hour,
+      minute: Number.isNaN(minute) ? 0 : minute,
+    };
   };
 
   const combineDateTime = (date: string, time: string) => {
@@ -243,26 +251,30 @@ export default function TambahEvent() {
           <TouchableOpacity
             style={[styles.inputContainer, { flex: 1 }]}
             onPress={() => {
-              setTempStartTime(startTimeValue || new Date());
+              const { hour, minute } = startTime ? parseTimeParts(startTime) : { hour: 0, minute: 0 };
+              setTempStartHour(hour);
+              setTempStartMinute(minute);
               setShowStartTimePicker(true);
             }}
           >
             <Ionicons name="time-outline" size={20} color="#8D6E63" style={styles.icon} />
-            <Text style={[styles.input, styles.boldText, !startTime && styles.placeholderText]}>
-              {startTime || 'Mulai'}
+            <Text style={[styles.input, styles.boldText, startTime === '00:00' && styles.placeholderText]}>
+              {startTime}
             </Text>
           </TouchableOpacity>
           <Text style={styles.dash}>-</Text>
           <TouchableOpacity
             style={[styles.inputContainer, { flex: 1 }]}
             onPress={() => {
-              setTempEndTime(endTimeValue || new Date());
+              const { hour, minute } = endTime ? parseTimeParts(endTime) : { hour: 0, minute: 0 };
+              setTempEndHour(hour);
+              setTempEndMinute(minute);
               setShowEndTimePicker(true);
             }}
           >
             <Ionicons name="time-outline" size={20} color="#8D6E63" style={styles.icon} />
-            <Text style={[styles.input, styles.boldText, !endTime && styles.placeholderText]}>
-              {endTime || 'Selesai'}
+            <Text style={[styles.input, styles.boldText, endTime === '00:00' && styles.placeholderText]}>
+              {endTime}
             </Text>
           </TouchableOpacity>
         </View>
@@ -409,23 +421,40 @@ export default function TambahEvent() {
         <View style={styles.modalOverlay}>
           <View style={styles.timePickerCard}>
             <Text style={styles.timePickerTitle}>Pilih Jam Mulai</Text>
-            <DateTimePicker
-              value={tempStartTime}
-              mode="time"
-              is24Hour
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selected) => {
-                if (Platform.OS !== 'ios') {
-                  setShowStartTimePicker(false);
-                  if (selected) {
-                    setStartTimeValue(selected);
-                    setStartTime(formatTime(selected));
-                  }
-                  return;
-                }
-                if (selected) setTempStartTime(selected);
-              }}
-            />
+            <View style={styles.timePickerListRow}>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const isActive = index === tempStartHour;
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempStartHour(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute, index) => {
+                  const isActive = index === tempStartMinute;
+                  return (
+                    <TouchableOpacity
+                      key={minute}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempStartMinute(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {minute}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
             <View style={styles.timePickerActions}>
               <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowStartTimePicker(false)}>
                 <Text style={styles.btnSecondaryText}>Batal</Text>
@@ -434,8 +463,7 @@ export default function TambahEvent() {
                 style={styles.btnPrimary}
                 onPress={() => {
                   setShowStartTimePicker(false);
-                  setStartTimeValue(tempStartTime);
-                  setStartTime(formatTime(tempStartTime));
+                  setStartTime(formatTimeParts(tempStartHour, tempStartMinute));
                 }}
               >
                 <Text style={styles.btnPrimaryText}>Pilih</Text>
@@ -449,23 +477,40 @@ export default function TambahEvent() {
         <View style={styles.modalOverlay}>
           <View style={styles.timePickerCard}>
             <Text style={styles.timePickerTitle}>Pilih Jam Selesai</Text>
-            <DateTimePicker
-              value={tempEndTime}
-              mode="time"
-              is24Hour
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selected) => {
-                if (Platform.OS !== 'ios') {
-                  setShowEndTimePicker(false);
-                  if (selected) {
-                    setEndTimeValue(selected);
-                    setEndTime(formatTime(selected));
-                  }
-                  return;
-                }
-                if (selected) setTempEndTime(selected);
-              }}
-            />
+            <View style={styles.timePickerListRow}>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const isActive = index === tempEndHour;
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempEndHour(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute, index) => {
+                  const isActive = index === tempEndMinute;
+                  return (
+                    <TouchableOpacity
+                      key={minute}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempEndMinute(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {minute}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
             <View style={styles.timePickerActions}>
               <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowEndTimePicker(false)}>
                 <Text style={styles.btnSecondaryText}>Batal</Text>
@@ -474,8 +519,7 @@ export default function TambahEvent() {
                 style={styles.btnPrimary}
                 onPress={() => {
                   setShowEndTimePicker(false);
-                  setEndTimeValue(tempEndTime);
-                  setEndTime(formatTime(tempEndTime));
+                  setEndTime(formatTimeParts(tempEndHour, tempEndMinute));
                 }}
               >
                 <Text style={styles.btnPrimaryText}>Pilih</Text>
@@ -491,7 +535,7 @@ export default function TambahEvent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FDF5E6',
+    backgroundColor: '#FEF2DB',
   },
 
   header: {
@@ -918,5 +962,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 10,
+  },
+
+  timePickerListRow: {
+    flexDirection: 'row',
+    gap: 12,
+    maxHeight: 220,
+  },
+
+  timePickerColumn: {
+    flex: 1,
+  },
+
+  timePickerItem: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+
+  timePickerItemActive: {
+    backgroundColor: '#FFF3E0',
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+  },
+
+  timePickerItemText: {
+    color: '#8D6E63',
+    fontWeight: '600',
+  },
+
+  timePickerItemTextActive: {
+    color: '#FF8C00',
+    fontWeight: 'bold',
   },
 });

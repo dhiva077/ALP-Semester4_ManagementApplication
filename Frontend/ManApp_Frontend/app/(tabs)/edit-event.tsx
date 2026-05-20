@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -31,8 +32,17 @@ export default function EditEvent() {
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [location, setLocation] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [startTime, setStartTime] = useState('00:00');
+  const [endTime, setEndTime] = useState('00:00');
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [tempStartHour, setTempStartHour] = useState(0);
+  const [tempStartMinute, setTempStartMinute] = useState(0);
+  const [tempEndHour, setTempEndHour] = useState(0);
+  const [tempEndMinute, setTempEndMinute] = useState(0);
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
   const [description, setDescription] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [originalEventId, setOriginalEventId] = useState<number | null>(null);
@@ -40,6 +50,20 @@ export default function EditEvent() {
   const [isLocked, setIsLocked] = useState(false);
 
   const STORAGE_KEY = 'MANAPP_EVENTS';
+
+  const formatTimeParts = (hour: number, minute: number) => {
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  };
+
+  const parseTimeParts = (value: string) => {
+    const [hourStr, minuteStr] = value.split(':');
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+    return {
+      hour: Number.isNaN(hour) ? 0 : hour,
+      minute: Number.isNaN(minute) ? 0 : minute,
+    };
+  };
 
   const handleBackToChecklist = () => {
     router.replace({
@@ -57,6 +81,8 @@ export default function EditEvent() {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays <= 7;
   };
+
+  const isValidTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
   useEffect(() => {
     const loadExistingEvent = async () => {
@@ -82,8 +108,8 @@ export default function EditEvent() {
           setEventDate(initialEventDate);
           setLocation(foundEvent.location || '');
           const [start, end] = foundEvent.time?.split(' - ') || ['', ''];
-          setStartTime(start || '');
-          setEndTime(end || '');
+          setStartTime(start || '00:00');
+          setEndTime(end || '00:00');
           setOriginalEventId(foundEvent.id);
           setDescription(foundEvent.description || '');
           if (Array.isArray(foundEvent.files)) {
@@ -121,6 +147,10 @@ export default function EditEvent() {
   };
 
   const validateAndSave = async () => {
+    if (!isValidTime(startTime) || !isValidTime(endTime)) {
+      Alert.alert('Perhatian', 'Format jam harus 00:00.');
+      return;
+    }
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       const savedEvents = stored ? JSON.parse(stored) : {};
@@ -226,27 +256,51 @@ export default function EditEvent() {
         </View>
 
         <View style={styles.timeRow}>
-          <View style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}>
+          <TouchableOpacity
+            style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}
+            disabled={isLocked}
+            onPress={() => {
+              const { hour, minute } = startTime ? parseTimeParts(startTime) : { hour: 0, minute: 0 };
+              setTempStartHour(hour);
+              setTempStartMinute(minute);
+              setShowStartTimePicker(true);
+            }}
+          >
             <Ionicons name="time-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
-            <TextInput
-              value={startTime}
-              onChangeText={setStartTime}
-              editable={!isLocked}
-              placeholder="Mulai"
-              style={[styles.input, styles.boldText, isLocked && styles.textDisabled]}
-            />
-          </View>
+            <Text
+              style={[
+                styles.input,
+                styles.boldText,
+                startTime === '00:00' && styles.placeholderText,
+                isLocked && styles.textDisabled,
+              ]}
+            >
+              {startTime}
+            </Text>
+          </TouchableOpacity>
           <Text style={styles.dash}>-</Text>
-          <View style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}>
+          <TouchableOpacity
+            style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}
+            disabled={isLocked}
+            onPress={() => {
+              const { hour, minute } = endTime ? parseTimeParts(endTime) : { hour: 0, minute: 0 };
+              setTempEndHour(hour);
+              setTempEndMinute(minute);
+              setShowEndTimePicker(true);
+            }}
+          >
             <Ionicons name="time-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
-            <TextInput
-              value={endTime}
-              onChangeText={setEndTime}
-              editable={!isLocked}
-              placeholder="Selesai"
-              style={[styles.input, styles.boldText, isLocked && styles.textDisabled]}
-            />
-          </View>
+            <Text
+              style={[
+                styles.input,
+                styles.boldText,
+                endTime === '00:00' && styles.placeholderText,
+                isLocked && styles.textDisabled,
+              ]}
+            >
+              {endTime}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionLabel}>Detail & Berkas</Text>
@@ -286,6 +340,118 @@ export default function EditEvent() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={showStartTimePicker} transparent animationType="fade" onRequestClose={() => setShowStartTimePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerCard}>
+            <Text style={styles.timePickerTitle}>Pilih Jam Mulai</Text>
+            <View style={styles.timePickerListRow}>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const isActive = index === tempStartHour;
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempStartHour(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute, index) => {
+                  const isActive = index === tempStartMinute;
+                  return (
+                    <TouchableOpacity
+                      key={minute}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempStartMinute(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {minute}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            <View style={styles.timePickerActions}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowStartTimePicker(false)}>
+                <Text style={styles.btnSecondaryText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={() => {
+                  setShowStartTimePicker(false);
+                  setStartTime(formatTimeParts(tempStartHour, tempStartMinute));
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>Pilih</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEndTimePicker} transparent animationType="fade" onRequestClose={() => setShowEndTimePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerCard}>
+            <Text style={styles.timePickerTitle}>Pilih Jam Selesai</Text>
+            <View style={styles.timePickerListRow}>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const isActive = index === tempEndHour;
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempEndHour(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute, index) => {
+                  const isActive = index === tempEndMinute;
+                  return (
+                    <TouchableOpacity
+                      key={minute}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempEndMinute(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {minute}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            <View style={styles.timePickerActions}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowEndTimePicker(false)}>
+                <Text style={styles.btnSecondaryText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={() => {
+                  setShowEndTimePicker(false);
+                  setEndTime(formatTimeParts(tempEndHour, tempEndMinute));
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>Pilih</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -411,6 +577,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  placeholderText: {
+    color: '#A1887F',
+  },
+
   descriptionInput: {
     flex: 1,
     textAlignVertical: 'top',
@@ -483,5 +653,93 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFF',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  timePickerCard: {
+    width: '85%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 10,
+  },
+
+  timePickerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4E342E',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+
+  timePickerListRow: {
+    flexDirection: 'row',
+    gap: 12,
+    maxHeight: 220,
+  },
+
+  timePickerColumn: {
+    flex: 1,
+    backgroundColor: '#FDF5E6',
+    borderRadius: 12,
+    paddingVertical: 8,
+  },
+
+  timePickerItem: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+
+  timePickerItemActive: {
+    backgroundColor: '#FF8C00',
+    marginHorizontal: 10,
+    borderRadius: 10,
+  },
+
+  timePickerItemText: {
+    color: '#5C2C00',
+    fontWeight: '600',
+  },
+
+  timePickerItemTextActive: {
+    color: '#FFF',
+  },
+
+  timePickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+
+  btnSecondary: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+  },
+
+  btnSecondaryText: {
+    color: '#8D6E63',
+    fontWeight: 'bold',
+  },
+
+  btnPrimary: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FF8C00',
+    alignItems: 'center',
+  },
+
+  btnPrimaryText: {
+    color: '#FFF',
+    fontWeight: 'bold',
   },
 });
