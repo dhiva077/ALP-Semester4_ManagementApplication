@@ -5,12 +5,12 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   TextInput, 
-  SafeAreaView, 
   ScrollView,
   Alert,
   Modal,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -136,6 +136,11 @@ export default function TambahEvent() {
     };
   };
 
+  const isEarlierThan = (a: { hour: number; minute: number }, b: { hour: number; minute: number }) => {
+    if (a.hour !== b.hour) return a.hour < b.hour;
+    return a.minute < b.minute;
+  };
+
   const combineDateTime = (date: string, time: string) => {
     return `${date} ${time}:00`;
   };
@@ -177,8 +182,15 @@ export default function TambahEvent() {
         }
       }
 
-      Alert.alert('Sukses', 'Event berhasil ditambahkan.');
-      resetForm();
+      Alert.alert('Sukses', 'Event berhasil ditambahkan.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            resetForm();
+            router.replace('/(tabs)/dashboard');
+          },
+        },
+      ]);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Terjadi masalah penyimpanan.';
       Alert.alert('Gagal', msg);
@@ -193,22 +205,25 @@ export default function TambahEvent() {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDay = new Date(year, month, 1).getDay();
     const shiftFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     let days = [];
     for (let i = 0; i < shiftFirstDay; i++) days.push(<View key={`empty-${i}`} style={styles.dateCell} />);
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const isSelected = eventDate === dateStr;
+      const isToday = dateStr === todayStr;
       days.push(
         <TouchableOpacity 
           key={d} 
-          style={[styles.dateCell, isSelected && styles.selectedDateCell]} 
+          style={[styles.dateCell, isSelected && styles.selectedDateCell, isToday && styles.todayDateCell]} 
           onPress={() => { 
             setEventDate(dateStr); 
             setShowDateModal(false); 
           }}
         >
-          <Text style={[styles.dateText, isSelected && styles.selectedDateText]}>{d}</Text>
+          <Text style={[styles.dateText, isSelected && styles.selectedDateText, isToday && styles.todayDateText]}>{d}</Text>
         </TouchableOpacity>
       );
     }
@@ -229,7 +244,14 @@ export default function TambahEvent() {
 
         <View style={styles.inputContainer}>
           <Ionicons name="people-outline" size={20} color="#8D6E63" style={styles.icon} />
-          <TextInput value={picName} onChangeText={setPicName} placeholder="Nama PIC Event" style={[styles.input, styles.boldText]} placeholderTextColor="#A1887F" />
+          <TextInput
+            value={picName}
+            onChangeText={setPicName}
+            editable={false}
+            placeholder="Nama PIC Event"
+            style={[styles.input, styles.boldText, styles.disabledInputText]}
+            placeholderTextColor="#A1887F"
+          />
         </View>
 
         <View style={styles.inputContainer}>
@@ -266,9 +288,12 @@ export default function TambahEvent() {
           <TouchableOpacity
             style={[styles.inputContainer, { flex: 1 }]}
             onPress={() => {
-              const { hour, minute } = endTime ? parseTimeParts(endTime) : { hour: 0, minute: 0 };
-              setTempEndHour(hour);
-              setTempEndMinute(minute);
+              const startParts = parseTimeParts(startTime || '00:00');
+              const endParts = endTime ? parseTimeParts(endTime) : startParts;
+              const safeHour = Math.max(endParts.hour, startParts.hour);
+              const safeMinute = safeHour === startParts.hour ? Math.max(endParts.minute, startParts.minute) : endParts.minute;
+              setTempEndHour(safeHour);
+              setTempEndMinute(safeMinute);
               setShowEndTimePicker(true);
             }}
           >
@@ -463,7 +488,13 @@ export default function TambahEvent() {
                 style={styles.btnPrimary}
                 onPress={() => {
                   setShowStartTimePicker(false);
-                  setStartTime(formatTimeParts(tempStartHour, tempStartMinute));
+                  const nextStart = { hour: tempStartHour, minute: tempStartMinute };
+                  setStartTime(formatTimeParts(nextStart.hour, nextStart.minute));
+
+                  const currentEnd = parseTimeParts(endTime || '00:00');
+                  if (isEarlierThan(currentEnd, nextStart)) {
+                    setEndTime(formatTimeParts(nextStart.hour, nextStart.minute));
+                  }
                 }}
               >
                 <Text style={styles.btnPrimaryText}>Pilih</Text>
@@ -480,6 +511,8 @@ export default function TambahEvent() {
             <View style={styles.timePickerListRow}>
               <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
                 {HOURS.map((hour, index) => {
+                  const startParts = parseTimeParts(startTime || '00:00');
+                  if (index < startParts.hour) return null;
                   const isActive = index === tempEndHour;
                   return (
                     <TouchableOpacity
@@ -496,6 +529,8 @@ export default function TambahEvent() {
               </ScrollView>
               <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
                 {MINUTES.map((minute, index) => {
+                  const startParts = parseTimeParts(startTime || '00:00');
+                  if (tempEndHour === startParts.hour && index < startParts.minute) return null;
                   const isActive = index === tempEndMinute;
                   return (
                     <TouchableOpacity
@@ -621,6 +656,10 @@ const styles = StyleSheet.create({
 
   placeholderText: {
     color: '#A1887F',
+  },
+
+  disabledInputText: {
+    color: '#8D6E63',
   },
 
   descriptionInput: {
@@ -780,8 +819,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
+  todayDateCell: {
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+    borderRadius: 10,
+  },
+
   selectedDateText: {
     color: '#FFF',
+    fontWeight: 'bold',
+  },
+
+  todayDateText: {
     fontWeight: 'bold',
   },
 
@@ -961,7 +1010,7 @@ const styles = StyleSheet.create({
   timePickerActions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 10,
+    marginTop: 12,
   },
 
   timePickerListRow: {
@@ -972,27 +1021,28 @@ const styles = StyleSheet.create({
 
   timePickerColumn: {
     flex: 1,
+    backgroundColor: '#FDF5E6',
+    borderRadius: 12,
+    paddingVertical: 8,
   },
 
   timePickerItem: {
     paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 12,
   },
 
   timePickerItemActive: {
-    backgroundColor: '#FFF3E0',
-    borderWidth: 1,
-    borderColor: '#FF8C00',
+    backgroundColor: '#FF8C00',
+    marginHorizontal: 10,
+    borderRadius: 10,
   },
 
   timePickerItemText: {
-    color: '#8D6E63',
+    color: '#5C2C00',
     fontWeight: '600',
   },
 
   timePickerItemTextActive: {
-    color: '#FF8C00',
-    fontWeight: 'bold',
+    color: '#FFF',
   },
 });

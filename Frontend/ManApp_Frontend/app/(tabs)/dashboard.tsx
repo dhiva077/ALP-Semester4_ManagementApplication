@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Image,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -100,18 +100,23 @@ export default function Dashboard() {
       'form_checklist_setelah_acara',
     ];
 
+    if (!file) return "#FF383C";
+
     const statusCodes = statusKeys.map((key, index) => {
+      const hasFile = !!file?.[docKeys[index]];
+      if (!hasFile) return 'B';
       const resolved = file?.[key] ?? file?.[toSnake(key)];
       if (resolved?.code) return resolved.code;
-      if (file?.[docKeys[index]]) return 'S';
-      return 'B';
+      return 'S';
     });
 
     const allSelesai = statusCodes.every(code => code === 'S');
     const allBelum = statusCodes.every(code => code === 'B');
+    const anyRevisi = statusCodes.some(code => code === 'R');
 
-    if (allSelesai) return "#606C38";
     if (allBelum) return "#FF383C";
+    if (allSelesai) return "#606C38";
+    if (anyRevisi) return "#EA9B03";
     return "#EA9B03";
   };
 
@@ -301,6 +306,7 @@ export default function Dashboard() {
           >
             <View style={eventStyles.content}>
               <Text style={eventStyles.title}>{event.title}</Text>
+              <Text style={eventStyles.subText}>PIC: {event.pic || '-'}</Text>
               <Text style={eventStyles.subText}>{event.location}</Text>
               <Text style={eventStyles.subText}>Pukul {event.time}</Text>
             </View>

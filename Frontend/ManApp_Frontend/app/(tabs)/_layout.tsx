@@ -19,7 +19,7 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen name="tambah-event" />
-      <Tabs.Screen name="profil" />
+      <Tabs.Screen name="profile" />
     </Tabs>
   );
 }

@@ -4,15 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class EventController extends Controller
 {
+    private const CACHE_KEY = 'events.index';
+    private const CACHE_TTL_SECONDS = 30;
+
     public function index()
     {
-        $events = Event::query()
-            ->with(['user', 'status', 'files'])
-            ->orderByDesc('created_at')
-            ->get();
+        $events = Cache::remember(self::CACHE_KEY, self::CACHE_TTL_SECONDS, function () {
+            return Event::query()
+                ->with(['user', 'status', 'files'])
+                ->orderByDesc('created_at')
+                ->get();
+        });
 
         return response()->json($events);
     }
@@ -30,6 +36,7 @@ class EventController extends Controller
         ]);
 
         $event = Event::create($validated);
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'Event berhasil dibuat.',
@@ -67,6 +74,7 @@ class EventController extends Controller
 
         $event->fill($validated);
         $event->save();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'Event berhasil diupdate.',
@@ -77,6 +85,7 @@ class EventController extends Controller
     public function destroy(Event $event)
     {
         $event->delete();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->noContent();
     }
