@@ -337,6 +337,12 @@ class FileController extends Controller
 
         if (isset($file->$statusColumn) || in_array($statusColumn, array_keys($file->getAttributes()))) {
             $file->$statusColumn = Status::where('code', 'S')->value('id');
+            
+            // Clear revision comment on re-upload
+            $commentColumn = 'revisi_' . $type;
+            if (in_array($commentColumn, array_keys($file->getAttributes()))) {
+                $file->$commentColumn = null;
+            }
         }
 
         $file->save();
@@ -367,11 +373,13 @@ class FileController extends Controller
             'event_id' => ['required', 'exists:events,id'],
             'doc_key' => ['required', 'string', 'in:' . implode(',', $allowedDocKeys)],
             'status_code' => ['required', 'string', 'in:B,R,S'], // B = Belum, R = Revisi, S = Selesai
+            'comment' => ['nullable', 'string'],
         ]);
 
         $eventId = $validated['event_id'];
         $docKey = $validated['doc_key'];
         $statusCode = $validated['status_code'];
+        $comment = $validated['comment'] ?? null;
 
         $file = File::where('event_id', $eventId)->first();
 
@@ -383,8 +391,19 @@ class FileController extends Controller
         $statusId = Status::where('code', $statusCode)->value('id');
 
         $file->$statusColumn = $statusId;
+        
+        // Handle revision comment
+        $commentColumn = 'revisi_' . $docKey;
+        if ($statusCode === 'R') {
+            $file->$commentColumn = $comment;
+        } else if ($statusCode === 'S') {
+            // Optional: clear comment when marked finished
+            $file->$commentColumn = null;
+        }
+
         if ($statusCode === 'B') {
             $file->$docKey = null;
+            $file->$commentColumn = null;
         }
         $file->save();
         Cache::forget(self::CACHE_KEY);

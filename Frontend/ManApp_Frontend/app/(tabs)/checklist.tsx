@@ -172,6 +172,8 @@ export default function Checklist() {
             const eventDateValue = currentEvent ? getEventDate(currentEvent) : currentEventDate;
             const eventIdValue = currentEvent?.id || eventId;
 
+            const revisionComment = fileRecord?.[`revisi_${item.docKey}`] || null;
+
             return (
               <TouchableOpacity
                 key={item.id}
@@ -195,7 +197,14 @@ export default function Checklist() {
                   });
                 }}
               >
-                <Text style={styles.checklistTitle}>{item.title}</Text>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={styles.checklistTitle}>{item.title}</Text>
+                  {statusCode === 'R' && revisionComment && (
+                    <Text style={styles.revisionCommentText}>
+                      Catatan: {revisionComment}
+                    </Text>
+                  )}
+                </View>
                 <View style={[styles.statusCircle, { backgroundColor: getStatusColor(statusCode) }]} />
               </TouchableOpacity>
             );
@@ -329,10 +338,16 @@ const styles = StyleSheet.create({
   },
 
   checklistTitle: {
-    flex: 1,
     fontSize: 15,
     fontWeight: 'bold',
     color: '#5C2C00',
+  },
+
+  revisionCommentText: {
+    fontSize: 12,
+    color: '#EA9B03',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 
   statusCircle: {

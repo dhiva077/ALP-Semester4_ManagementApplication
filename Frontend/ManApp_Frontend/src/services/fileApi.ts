@@ -58,12 +58,18 @@ export const uploadEventPdf = async (
 export const updateFileStatus = async (
   eventId: number,
   docKey: string,
-  statusCode: FileStatusCode
+  statusCode: FileStatusCode,
+  comment?: string
 ) => {
   const payload = await fetchJson<any>(`${API_BASE}/files/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event_id: eventId, doc_key: docKey, status_code: statusCode }),
+    body: JSON.stringify({
+      event_id: eventId,
+      doc_key: docKey,
+      status_code: statusCode,
+      comment: comment,
+    }),
   });
 
   filesCache = null;
