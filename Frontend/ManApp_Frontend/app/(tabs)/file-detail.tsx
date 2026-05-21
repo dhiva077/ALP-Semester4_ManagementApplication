@@ -5,6 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,6 +26,8 @@ export default function FileDetail() {
   );
   const [isManager, setIsManager] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [revisionComment, setRevisionComment] = useState('');
 
   useEffect(() => {
     const loadCurrentUser = async () => {
@@ -158,6 +162,30 @@ export default function FileDetail() {
     ]);
   };
 
+  const handleRevisiSubmit = async () => {
+    if (!revisionComment.trim()) {
+      Alert.alert('Peringatan', 'Komentar revisi tidak boleh kosong.');
+      return;
+    }
+
+    if (!eventId || !docKey) {
+      Alert.alert('Gagal', 'Event atau dokumen tidak valid.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await updateFileStatus(Number(eventId), String(docKey), 'R', revisionComment);
+      setShowRevisionModal(false);
+      handleBackToChecklist();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Gagal memperbarui status.';
+      Alert.alert('Gagal', msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -191,22 +219,7 @@ export default function FileDetail() {
           <View style={styles.decisionRow}>
             <TouchableOpacity
               style={[styles.btnDecision, styles.btnRevisi, isSubmitting && { opacity: 0.6 }]}
-              onPress={async () => {
-                if (!eventId || !docKey) {
-                  Alert.alert('Gagal', 'Event atau dokumen tidak valid.');
-                  return;
-                }
-                try {
-                  setIsSubmitting(true);
-                  await updateFileStatus(Number(eventId), String(docKey), 'R');
-                  handleBackToChecklist();
-                } catch (error) {
-                  const msg = error instanceof Error ? error.message : 'Gagal memperbarui status.';
-                  Alert.alert('Gagal', msg);
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
+              onPress={() => setShowRevisionModal(true)}
               disabled={isSubmitting}
             >
               <Ionicons name="alert-circle" size={20} color="#FFF" /><Text style={styles.btnDecisionText}>Revisi</Text>
@@ -217,6 +230,42 @@ export default function FileDetail() {
           </View>
         )}
       </View>
+
+      <Modal
+        visible={showRevisionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRevisionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Komentar Revisi</Text>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Masukkan alasan revisi..."
+              multiline
+              numberOfLines={4}
+              value={revisionComment}
+              onChangeText={setRevisionComment}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.modalBtnCancel]} 
+                onPress={() => setShowRevisionModal(false)}
+              >
+                <Text style={styles.modalBtnTextCancel}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.modalBtnConfirm]} 
+                onPress={handleRevisiSubmit}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.modalBtnTextConfirm}>Kirim Revisi</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -335,5 +384,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#FFF',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#FFFDF0',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 5,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+
+  commentInput: {
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#D2B48C',
+    borderRadius: 10,
+    padding: 12,
+    height: 100,
+    textAlignVertical: 'top',
+    color: '#5C2C00',
+    marginBottom: 20,
+  },
+
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+
+  modalBtn: {
+    flex: 1,
+    height: 45,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  modalBtnCancel: {
+    borderWidth: 1,
+    borderColor: '#5C2C00',
+  },
+
+  modalBtnConfirm: {
+    backgroundColor: '#5C2C00',
+  },
+
+  modalBtnTextCancel: {
+    color: '#5C2C00',
+    fontWeight: '600',
+  },
+
+  modalBtnTextConfirm: {
+    color: '#FFF',
+    fontWeight: '600',
   },
 });
