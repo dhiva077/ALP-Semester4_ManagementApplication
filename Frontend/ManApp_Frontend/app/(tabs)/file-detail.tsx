@@ -4,9 +4,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -92,7 +92,9 @@ export default function FileDetail() {
         );
         const newUrl = buildFileUrl(uploaded?.path) || result.assets[0].uri;
         setCurrentFileUri(newUrl);
-        Alert.alert("Berhasil", "File berhasil diganti.");
+        Alert.alert("Berhasil", "File berhasil diganti.", [
+          { text: 'OK', onPress: () => handleBackToChecklist() },
+        ]);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Gagal mengganti file.';

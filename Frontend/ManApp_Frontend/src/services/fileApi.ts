@@ -2,11 +2,25 @@ import { API_BASE, API_ORIGIN, fetchJson, fetchWithTimeout } from './apiClient';
 
 export type FileStatusCode = 'B' | 'R' | 'S';
 
-export const fetchFiles = async () => {
-  return fetchJson<any[]>(`${API_BASE}/files`, {
+type CacheEntry<T> = { data: T; timestamp: number };
+
+const DEFAULT_TTL_MS = 60000;
+let filesCache: CacheEntry<any[]> | null = null;
+
+export const fetchFiles = async (options?: { force?: boolean; ttlMs?: number }) => {
+  const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
+  const now = Date.now();
+  if (!options?.force && filesCache && now - filesCache.timestamp < ttlMs) {
+    return filesCache.data;
+  }
+
+  const data = await fetchJson<any[]>(`${API_BASE}/files`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
   });
+
+  filesCache = { data, timestamp: now };
+  return data;
 };
 
 export const uploadEventPdf = async (
@@ -36,7 +50,9 @@ export const uploadEventPdf = async (
     throw new Error(`${(err as any).message || `Error ${res.status}`}`);
   }
 
-  return res.json();
+  const payload = await res.json();
+  filesCache = null;
+  return payload;
 };
 
 export const updateFileStatus = async (
@@ -44,11 +60,14 @@ export const updateFileStatus = async (
   docKey: string,
   statusCode: FileStatusCode
 ) => {
-  return fetchJson<any>(`${API_BASE}/files/status`, {
+  const payload = await fetchJson<any>(`${API_BASE}/files/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ event_id: eventId, doc_key: docKey, status_code: statusCode }),
   });
+
+  filesCache = null;
+  return payload;
 };
 
 export const buildFileUrl = (path?: string | null) => {

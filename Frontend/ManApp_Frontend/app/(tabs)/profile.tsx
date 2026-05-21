@@ -13,13 +13,14 @@ import {
   Modal,
   FlatList,
   Dimensions,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { fetchEvents } from '../../src/services/eventService';
+import { fetchFiles } from '../../src/services/fileApi';
 
 const { width } = Dimensions.get('window');
 
@@ -65,11 +66,21 @@ export default function Profile() {
           setSelectedAvatar(DEFAULT_AVATAR);
         }
 
-        // Fetch events for history
+        // Fetch events and files for history
         if (loadedUser?.id) {
-            const allEvents = await fetchEvents();
-            const userEvents = allEvents.filter((ev: any) => ev.user_id === loadedUser.id);
-            setHistoryEvents(userEvents);
+          const [allEvents, allFiles] = await Promise.all([fetchEvents(), fetchFiles()]);
+          const fileMap = new Map(
+            allFiles.map((file: any) => [String(file.event_id), file])
+          );
+          const userEvents = allEvents.filter((ev: any) => ev.user_id === loadedUser.id);
+          const mapped = userEvents.map((ev: any) => {
+            const file = fileMap.get(String(ev.id));
+            return {
+              ...ev,
+              _file: file || null,
+            };
+          });
+          setHistoryEvents(mapped);
         }
       } catch (error) {
         console.error('Failed load profile data:', error);
@@ -123,6 +134,48 @@ export default function Profile() {
     
     // Fallback default atau berdasarkan database role jika ada
     return currentUser?.role === 'manager' ? 'PIC Event' : 'PIC Event';
+  };
+
+  const toSnake = (value: string) => value.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+
+  const getHistoryStatus = (file: any) => {
+    const statusKeys = [
+      'statusFormChecklistSebelumAcara',
+      'statusSuratPerjanjianKerjasama',
+      'statusInvoice',
+      'statusLembarDisposisi',
+      'statusSuratIzinLoading',
+      'statusFormChecklistSetelahAcara',
+    ];
+    const docKeys = [
+      'form_checklist_sebelum_acara',
+      'surat_perjanjian_kerjasama',
+      'invoice',
+      'lembar_disposisi',
+      'surat_izin_loading',
+      'form_checklist_setelah_acara',
+    ];
+
+    if (!file) {
+      return { label: 'Belum', color: '#FF383C', badgeBg: '#FFE7E7' };
+    }
+
+    const statusCodes = statusKeys.map((key, index) => {
+      const hasFile = !!file?.[docKeys[index]];
+      if (!hasFile) return 'B';
+      const resolved = file?.[key] ?? file?.[toSnake(key)];
+      if (resolved?.code) return resolved.code;
+      return 'S';
+    });
+
+    const allSelesai = statusCodes.every(code => code === 'S');
+    const allBelum = statusCodes.every(code => code === 'B');
+    const anyRevisi = statusCodes.some(code => code === 'R');
+
+    if (allBelum) return { label: 'Belum', color: '#FF383C', badgeBg: '#FFE7E7' };
+    if (allSelesai) return { label: 'Selesai', color: '#606C38', badgeBg: '#E8F5E9' };
+    if (anyRevisi) return { label: 'Revisi', color: '#EA9B03', badgeBg: '#FFF3E0' };
+    return { label: 'Proses', color: '#EA9B03', badgeBg: '#FFF3E0' };
   };
 
   return (
@@ -197,15 +250,17 @@ export default function Profile() {
                     month: 'long',
                     year: 'numeric'
                   });
+                  const status = getHistoryStatus(event._file);
                   return (
                     <View key={event.id || index} style={[styles.eventItem, index > 0 && { marginTop: 15 }]}>
-                      <View style={styles.eventDot} />
+                      <View style={[styles.eventDot, { backgroundColor: status.color }]} />
                       <View style={styles.eventInfo}>
                         <Text style={styles.eventName}>{event.name}</Text>
                         <Text style={styles.eventDate}>{eventDate} • PIC Event</Text>
                       </View>
-                      <View style={styles.statusBadge}>
-                        <Text style={styles.statusText}>{event.status?.name || 'Selesai'}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: status.badgeBg }]}
+                      >
+                        <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
                       </View>
                     </View>
                   );

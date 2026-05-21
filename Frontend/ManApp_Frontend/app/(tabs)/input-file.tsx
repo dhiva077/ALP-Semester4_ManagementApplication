@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Modal,
   FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import useInputFileViewModel from '../../src/viewmodels/useInputFileViewModel';
@@ -101,17 +101,26 @@ export default function InputFile() {
   // Memasang data event otomatis jika dilempar melalui parameter halaman (dari checklist)
   useEffect(() => {
     if (eventName) {
-      let found = events.find(e => normalizeName(e.name) === normalizeName(eventName));
+      let found = null;
+      const eventIdParam = params.eventId ? Number(params.eventId) : undefined;
+
+      if (eventIdParam) {
+        found = events.find(e => Number(e.id) === eventIdParam) || null;
+      }
+
+      if (!found) {
+        found = events.find(e => normalizeName(e.name) === normalizeName(eventName)) || null;
+      }
 
       if (!found && eventDate) {
-        found = events.find(e => e.date === eventDate);
+        found = events.find(e => e.date === eventDate) || null;
       }
 
       if (!found && eventName !== "Detail Event") {
         found = events.find(e =>
           normalizeName(e.name).includes(normalizeName(eventName)) ||
           normalizeName(eventName).includes(normalizeName(e.name))
-        );
+        ) || null;
       }
 
       if (found) {
@@ -126,7 +135,7 @@ export default function InputFile() {
         const safePic = params.pic && params.pic !== 'Petugas' ? params.pic : 'Fathir';
 
         setSelectedEvent({
-          id: params.eventId ? Number(params.eventId) : undefined,
+          id: eventIdParam,
           name: eventName === "Detail Event" ? "Event Pilihan" : eventName,
           date: eventDate || '2026-05-20',
           location: safeLocation,

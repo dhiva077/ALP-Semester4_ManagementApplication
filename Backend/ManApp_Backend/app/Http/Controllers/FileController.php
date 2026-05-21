@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\File;
 use App\Models\Status;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Smalot\PdfParser\Parser;
 
 class FileController extends Controller
 {
+    private const CACHE_KEY = 'files.index';
+    private const CACHE_TTL_SECONDS = 30;
     private function attachUrls(File $file, Request $request): File
     {
         $host = $request->getSchemeAndHttpHost();
@@ -26,7 +29,7 @@ class FileController extends Controller
             $path = $file->{$column};
             $file->setAttribute(
                 $column . '_url',
-                $path ? $host . Storage::url($path) : null
+                $path ? $host . '/storage/' . ltrim($path, '/') : null
             );
         }
 
@@ -35,19 +38,20 @@ class FileController extends Controller
 
     public function index()
     {
-        $files = File::query()
-            ->with([
-                'event',
-                'statusFormChecklistSebelumAcara',
-                'statusSuratPerjanjianKerjasama',
-                'statusInvoice',
-                'statusLembarDisposisi',
-                'statusSuratIzinLoading',
-                'statusFormChecklistSetelahAcara',
-            ])
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (File $file) => $this->attachUrls($file, request()));
+        $files = Cache::remember(self::CACHE_KEY, self::CACHE_TTL_SECONDS, function () {
+            return File::query()
+                ->with([
+                    'event',
+                    'statusFormChecklistSebelumAcara',
+                    'statusSuratPerjanjianKerjasama',
+                    'statusInvoice',
+                    'statusLembarDisposisi',
+                    'statusSuratIzinLoading',
+                    'statusFormChecklistSetelahAcara',
+                ])
+                ->orderByDesc('created_at')
+                ->get();
+        })->map(fn (File $file) => $this->attachUrls($file, request()));
 
         return response()->json($files);
     }
@@ -71,6 +75,7 @@ class FileController extends Controller
         ]);
 
         $file = File::create($validated);
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'File berhasil dibuat.',
@@ -121,6 +126,7 @@ class FileController extends Controller
 
         $file->fill($validated);
         $file->save();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'File berhasil diupdate.',
@@ -139,6 +145,7 @@ class FileController extends Controller
     public function destroy(File $file)
     {
         $file->delete();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->noContent();
     }
@@ -333,13 +340,14 @@ class FileController extends Controller
         }
 
         $file->save();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'File berhasil diupload.',
             'type' => $type,
             'filename' => $filename,
             'path' => $path,
-            'url' => $request->getSchemeAndHttpHost() . Storage::url($path),
+            'url' => $request->getSchemeAndHttpHost() . '/storage/' . ltrim($path, '/'),
             'text_preview' => substr($text, 0, 200),
         ]);
     }
@@ -379,6 +387,7 @@ class FileController extends Controller
             $file->$docKey = null;
         }
         $file->save();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'Status berhasil diperbarui.',

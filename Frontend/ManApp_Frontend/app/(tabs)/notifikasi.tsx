@@ -138,6 +138,7 @@ export default function Notifikasi() {
                   params: {
                     eventName: item.eventName,
                     eventDate: item.eventDate,
+                    eventId: String(item.id),
                   },
                 })
               }

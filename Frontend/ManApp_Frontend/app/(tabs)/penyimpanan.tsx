@@ -5,17 +5,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   ScrollView,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { fetchEvents } from '../../src/services/eventService';
 import { fetchFiles } from '../../src/services/fileApi';
 
-interface EventItem { id: number; title: string; location: string; time: string; color: string; date: string; }
+interface EventItem { id: number; title: string; location: string; time: string; color: string; date: string; pic?: string; }
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
@@ -79,17 +79,23 @@ export default function Penyimpanan() {
       'form_checklist_setelah_acara',
     ];
 
+    if (!file) return "#FF383C";
+
     const statusCodes = statusKeys.map((key, index) => {
+      const hasFile = !!file?.[docKeys[index]];
+      if (!hasFile) return 'B';
       const resolved = file?.[key] ?? file?.[toSnake(key)];
       if (resolved?.code) return resolved.code;
-      if (file?.[docKeys[index]]) return 'S';
-      return 'B';
+      return 'S';
     });
+
     const allSelesai = statusCodes.every(code => code === 'S');
     const allBelum = statusCodes.every(code => code === 'B');
+    const anyRevisi = statusCodes.some(code => code === 'R');
 
-    if (allSelesai) return "#606C38";
     if (allBelum) return "#FF383C";
+    if (allSelesai) return "#606C38";
+    if (anyRevisi) return "#EA9B03";
     return "#EA9B03";
   };
 
@@ -110,6 +116,7 @@ export default function Penyimpanan() {
           time,
           date,
           color,
+          pic: event?.user?.name,
         };
       });
 
@@ -147,7 +154,7 @@ export default function Penyimpanan() {
     <SafeAreaView style={styles.container}>
       <View style={styles.fixedSection}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.replace('/(tabs)/dashboard')} style={styles.backButton}>
             <Ionicons name="chevron-back" size={28} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Penyimpanan</Text>
@@ -198,6 +205,7 @@ export default function Penyimpanan() {
             >
               <View style={styles.cardInfo}>
                 <Text style={styles.eventTitle}>{item.title}</Text>
+                <Text style={styles.eventSubText}>PIC: {item.pic || '-'}</Text>
                 <Text style={styles.eventSubText}>{item.location}</Text>
                 <Text style={styles.eventSubText}>
                   {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}

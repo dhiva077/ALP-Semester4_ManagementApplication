@@ -5,9 +5,9 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   TextInput, 
-  SafeAreaView, 
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -47,19 +47,14 @@ export default function Checklist() {
       let matched = null;
       if (eventId) {
         matched = events.find((e: any) => String(e.id) === String(eventId));
-      }
+      } else {
+        if (eventName) {
+          matched = events.find((e: any) => e.name === eventName);
+        }
 
-      if (!matched && eventName) {
-        matched = events.find((e: any) => e.name === eventName);
-      }
-
-      if (!matched && eventDate) {
-        matched = events.find((e: any) => getEventDate(e) === eventDate);
-      }
-
-      if (!matched && eventName) {
-        const fileMatched = files.find((file: any) => file?.event?.name === eventName);
-        matched = fileMatched?.event || null;
+        if (!matched && eventDate) {
+          matched = events.find((e: any) => getEventDate(e) === eventDate);
+        }
       }
 
       setCurrentEvent(matched || null);
@@ -68,15 +63,6 @@ export default function Checklist() {
       let relatedFile = null;
       if (eventIdValue) {
         relatedFile = files.find((file: any) => String(file.event_id) === String(eventIdValue));
-      }
-      if (!relatedFile && eventName) {
-        relatedFile = files.find((file: any) => file?.event?.name === eventName);
-      }
-      if (!relatedFile && eventDate) {
-        relatedFile = files.find((file: any) => {
-          const fileDate = getEventDate(file?.event || {});
-          return fileDate === eventDate;
-        });
       }
 
       setFileRecord(relatedFile || null);
@@ -107,10 +93,11 @@ export default function Checklist() {
   const toSnake = (value: string) => value.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
 
   const getStatusCode = (statusKey: string, docKey: string) => {
+    const hasFile = !!fileRecord?.[docKey];
+    if (!hasFile) return 'B';
     const resolvedStatus = fileRecord?.[statusKey] ?? fileRecord?.[toSnake(statusKey)];
     if (resolvedStatus?.code) return resolvedStatus.code;
-    if (fileRecord?.[docKey]) return 'S';
-    return 'B';
+    return 'S';
   };
 
   return (
@@ -143,7 +130,20 @@ export default function Checklist() {
               onChangeText={setSearchQuery}
             />
           </View>
-          <TouchableOpacity style={styles.editButton} onPress={() => router.push({ pathname: '/(tabs)/edit-event', params: { eventName: currentEventName, eventDate: currentEventDate, source: 'checklist' } })}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() =>
+              router.push({
+                pathname: '/(tabs)/edit-event',
+                params: {
+                  eventName: currentEventName,
+                  eventDate: currentEventDate,
+                  eventId: currentEvent?.id || eventId,
+                  source: 'checklist',
+                },
+              })
+            }
+          >
             <MaterialCommunityIcons name="pencil" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
