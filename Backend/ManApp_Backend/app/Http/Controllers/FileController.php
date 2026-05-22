@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\File;
 use App\Models\Status;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Smalot\PdfParser\Parser;
 
 class FileController extends Controller
 {
+    private const CACHE_KEY = 'files.index';
+    private const CACHE_TTL_SECONDS = 30;
     private function attachUrls(File $file, Request $request): File
     {
         $host = $request->getSchemeAndHttpHost();
@@ -26,7 +29,7 @@ class FileController extends Controller
             $path = $file->{$column};
             $file->setAttribute(
                 $column . '_url',
-                $path ? $host . Storage::url($path) : null
+                $path ? $host . '/storage/' . ltrim($path, '/') : null
             );
         }
 
@@ -35,19 +38,20 @@ class FileController extends Controller
 
     public function index()
     {
-        $files = File::query()
-            ->with([
-                'event',
-                'statusFormChecklistSebelumAcara',
-                'statusSuratPerjanjianKerjasama',
-                'statusInvoice',
-                'statusLembarDisposisi',
-                'statusSuratIzinLoading',
-                'statusFormChecklistSetelahAcara',
-            ])
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (File $file) => $this->attachUrls($file, request()));
+        $files = Cache::remember(self::CACHE_KEY, self::CACHE_TTL_SECONDS, function () {
+            return File::query()
+                ->with([
+                    'event',
+                    'statusFormChecklistSebelumAcara',
+                    'statusSuratPerjanjianKerjasama',
+                    'statusInvoice',
+                    'statusLembarDisposisi',
+                    'statusSuratIzinLoading',
+                    'statusFormChecklistSetelahAcara',
+                ])
+                ->orderByDesc('created_at')
+                ->get();
+        })->map(fn (File $file) => $this->attachUrls($file, request()));
 
         return response()->json($files);
     }
@@ -71,6 +75,7 @@ class FileController extends Controller
         ]);
 
         $file = File::create($validated);
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'File berhasil dibuat.',
@@ -121,6 +126,7 @@ class FileController extends Controller
 
         $file->fill($validated);
         $file->save();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'File berhasil diupdate.',
@@ -139,19 +145,31 @@ class FileController extends Controller
     public function destroy(File $file)
     {
         $file->delete();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->noContent();
     }
 
     public function upload(Request $request)
     {
+        $allowedDocKeys = [
+            'form_checklist_sebelum_acara',
+            'surat_perjanjian_kerjasama',
+            'invoice',
+            'lembar_disposisi',
+            'surat_izin_loading',
+            'form_checklist_setelah_acara',
+        ];
+
         $validated = $request->validate([
             'event_id' => ['required', 'exists:events,id'],
             'pdf_file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'expected_doc_key' => ['nullable', 'string', 'in:' . implode(',', $allowedDocKeys)],
         ]);
 
         $eventId = $validated['event_id'];
         $pdfFile = $validated['pdf_file'];
+        $expectedDocKey = $validated['expected_doc_key'] ?? null;
 
         // Parse PDF using pure PHP
         $parser = new Parser();
@@ -159,11 +177,13 @@ class FileController extends Controller
         $text = $pdf->getText();
 
         $lowerText = strtolower($text);
+        $normalizedText = trim(preg_replace('/[^a-z0-9]+/i', ' ', $lowerText));
 
         $documentMappings = [
             'form_checklist_sebelum_acara' => [
                 'form_checklist_sebelum_acara',
                 'checklist sebelum',
+                'Checklist Sebelum Acara',
                 'sebelum acara',
                 'form checklist sebelum',
                 'pre-event',
@@ -177,6 +197,7 @@ class FileController extends Controller
             'surat_perjanjian_kerjasama'   => [
                 'surat_perjanjian_kerjasama',
                 'perjanjian kerjasama',
+                'Perjanjian Kerjasama',
                 'surat perjanjian',
                 'spk',
                 'mou',
@@ -191,6 +212,7 @@ class FileController extends Controller
             ],
             'invoice'                      => [
                 'invoice',
+                'Invoice',
                 'faktur',
                 'tagihan',
                 'receipt',
@@ -206,6 +228,7 @@ class FileController extends Controller
             'lembar_disposisi'             => [
                 'lembar_disposisi',
                 'lembar disposisi',
+                'Lembar Disposisi',
                 'disposisi',
                 'surat tugas',
                 'penugasan',
@@ -219,6 +242,7 @@ class FileController extends Controller
             ],
             'surat_izin_loading'           => [
                 'surat_izin_loading',
+                'Surat Izin Loading',
                 'izin loading',
                 'surat izin',
                 'loading',
@@ -235,6 +259,7 @@ class FileController extends Controller
             'form_checklist_setelah_acara' => [
                 'form_checklist_setelah_acara',
                 'checklist setelah',
+                'Checklist Setelah Acara',
                 'setelah acara',
                 'form checklist setelah',
                 'post-event',
@@ -249,19 +274,42 @@ class FileController extends Controller
         ];
 
         $type = null;
+        $sentences = preg_split('/[.!?\r\n]+/', $text) ?: [];
 
-        foreach ($documentMappings as $column => $keywords) {
-            foreach ($keywords as $keyword) {
-                if (str_contains($lowerText, $keyword)) {
-                    $type = $column;
-                    break 2;
+        foreach ($sentences as $sentence) {
+            $normalizedSentence = trim(preg_replace('/[^a-z0-9]+/i', ' ', strtolower($sentence)));
+            if ($normalizedSentence === '') {
+                continue;
+            }
+
+            foreach ($documentMappings as $column => $keywords) {
+                foreach ($keywords as $keyword) {
+                    $normalizedKeyword = strtolower(str_replace(['_', '-'], ' ', $keyword));
+                    $pattern = '/\b' . preg_quote($normalizedKeyword, '/') . '\b/i';
+                    if (preg_match($pattern, $normalizedSentence)) {
+                        $type = $column;
+                        break 3;
+                    }
                 }
             }
+        }
+
+        if (!$type && strlen($normalizedText) < 3) {
+            return response()->json([
+                'message' => 'PDF tidak terbaca atau teks terlalu sedikit.'
+            ], 400);
         }
 
         if (!$type) {
             return response()->json([
                 'message' => 'Jenis dokumen tidak dikenali.'
+            ], 400);
+        }
+
+        if ($expectedDocKey && $expectedDocKey !== $type) {
+            return response()->json([
+                'message' => 'Dokumen tidak sesuai dengan jenis yang dipilih.',
+                'detected_type' => $type,
             ], 400);
         }
 
@@ -289,16 +337,23 @@ class FileController extends Controller
 
         if (isset($file->$statusColumn) || in_array($statusColumn, array_keys($file->getAttributes()))) {
             $file->$statusColumn = Status::where('code', 'S')->value('id');
+            
+            // Clear revision comment on re-upload
+            $commentColumn = 'revisi_' . $type;
+            if (in_array($commentColumn, array_keys($file->getAttributes()))) {
+                $file->$commentColumn = null;
+            }
         }
 
         $file->save();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'File berhasil diupload.',
             'type' => $type,
             'filename' => $filename,
             'path' => $path,
-            'url' => $request->getSchemeAndHttpHost() . Storage::url($path),
+            'url' => $request->getSchemeAndHttpHost() . '/storage/' . ltrim($path, '/'),
             'text_preview' => substr($text, 0, 200),
         ]);
     }
@@ -318,11 +373,13 @@ class FileController extends Controller
             'event_id' => ['required', 'exists:events,id'],
             'doc_key' => ['required', 'string', 'in:' . implode(',', $allowedDocKeys)],
             'status_code' => ['required', 'string', 'in:B,R,S'], // B = Belum, R = Revisi, S = Selesai
+            'comment' => ['nullable', 'string'],
         ]);
 
         $eventId = $validated['event_id'];
         $docKey = $validated['doc_key'];
         $statusCode = $validated['status_code'];
+        $comment = $validated['comment'] ?? null;
 
         $file = File::where('event_id', $eventId)->first();
 
@@ -334,10 +391,22 @@ class FileController extends Controller
         $statusId = Status::where('code', $statusCode)->value('id');
 
         $file->$statusColumn = $statusId;
+        
+        // Handle revision comment
+        $commentColumn = 'revisi_' . $docKey;
+        if ($statusCode === 'R') {
+            $file->$commentColumn = $comment;
+        } else if ($statusCode === 'S') {
+            // Optional: clear comment when marked finished
+            $file->$commentColumn = null;
+        }
+
         if ($statusCode === 'B') {
             $file->$docKey = null;
+            $file->$commentColumn = null;
         }
         $file->save();
+        Cache::forget(self::CACHE_KEY);
 
         return response()->json([
             'message' => 'Status berhasil diperbarui.',

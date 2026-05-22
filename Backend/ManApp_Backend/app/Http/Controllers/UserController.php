@@ -102,10 +102,21 @@ class UserController extends Controller
     public function savePushToken(Request $request)
     {
         $request->validate([
-            'token' => 'required|string'
+            'token' => 'required|string',
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
         $user = $request->user();
+        if (!$user && $request->filled('user_id')) {
+            $user = User::find($request->user_id);
+        }
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Token diterima, user tidak ditemukan.'
+            ], 200);
+        }
+
         $user->update(['expo_push_token' => $request->token]);
 
         return response()->json(['message' => 'Token saved successfully.']);

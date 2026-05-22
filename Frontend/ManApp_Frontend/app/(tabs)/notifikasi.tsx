@@ -138,6 +138,7 @@ export default function Notifikasi() {
                   params: {
                     eventName: item.eventName,
                     eventDate: item.eventDate,
+                    eventId: String(item.id),
                   },
                 })
               }
@@ -176,7 +177,7 @@ export default function Notifikasi() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2E3C9",
+    backgroundColor: "#FEF2DB",
   },
 
   header: {

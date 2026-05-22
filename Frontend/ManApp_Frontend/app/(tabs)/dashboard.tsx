@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Image,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,11 +58,24 @@ export default function Dashboard() {
     return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
   };
 
+  const parseEventTime = (value?: string) => {
+    if (!value) return null;
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const formatTime = (date: Date) => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   const getEventTime = (event: any) => {
-    const start = event?.start_time || '';
-    const end = event?.end_time || '';
-    const startTime = start.includes('T') ? start.split('T')[1]?.slice(0, 5) : start.split(' ')[1]?.slice(0, 5);
-    const endTime = end.includes('T') ? end.split('T')[1]?.slice(0, 5) : end.split(' ')[1]?.slice(0, 5);
+    const startDate = parseEventTime(event?.start_time);
+    const endDate = parseEventTime(event?.end_time);
+    const startTime = startDate ? formatTime(startDate) : '';
+    const endTime = endDate ? formatTime(endDate) : '';
     if (startTime && endTime) return `${startTime} - ${endTime}`;
     return startTime || endTime || '';
   };
@@ -87,18 +100,23 @@ export default function Dashboard() {
       'form_checklist_setelah_acara',
     ];
 
+    if (!file) return "#FF383C";
+
     const statusCodes = statusKeys.map((key, index) => {
+      const hasFile = !!file?.[docKeys[index]];
+      if (!hasFile) return 'B';
       const resolved = file?.[key] ?? file?.[toSnake(key)];
       if (resolved?.code) return resolved.code;
-      if (file?.[docKeys[index]]) return 'S';
-      return 'B';
+      return 'S';
     });
 
     const allSelesai = statusCodes.every(code => code === 'S');
     const allBelum = statusCodes.every(code => code === 'B');
+    const anyRevisi = statusCodes.some(code => code === 'R');
 
-    if (allSelesai) return "#606C38";
     if (allBelum) return "#FF383C";
+    if (allSelesai) return "#606C38";
+    if (anyRevisi) return "#EA9B03";
     return "#EA9B03";
   };
 
@@ -288,6 +306,7 @@ export default function Dashboard() {
           >
             <View style={eventStyles.content}>
               <Text style={eventStyles.title}>{event.title}</Text>
+              <Text style={eventStyles.subText}>PIC: {event.pic || '-'}</Text>
               <Text style={eventStyles.subText}>{event.location}</Text>
               <Text style={eventStyles.subText}>Pukul {event.time}</Text>
             </View>

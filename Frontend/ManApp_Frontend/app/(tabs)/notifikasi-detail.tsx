@@ -11,12 +11,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchEvents } from '../../src/services/eventService';
 
 export default function NotifikasiDetail() {
   const router = useRouter();
-  const { eventName, eventDate } = useLocalSearchParams();
+  const { eventName, eventDate, eventId } = useLocalSearchParams();
   const [eventData, setEventData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +44,12 @@ export default function NotifikasiDetail() {
   const handleGoToChecklist = () => {
     router.push({
       pathname: '/(tabs)/checklist',
-      params: { eventName: title, eventDate: date, source: 'notifikasi' },
+      params: {
+        eventName: title,
+        eventDate: date,
+        eventId: eventData?.id || eventId,
+        source: 'notifikasi',
+      },
     });
   };
 

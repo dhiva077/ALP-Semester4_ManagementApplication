@@ -3,6 +3,7 @@ import { API_CONFIG } from '../config/api';
 
 const API_BASE = API_CONFIG.BASE_URL;
 const TIMEOUT_MS = 30000;
+const LOG_API = false;
 
 const fetchWithTimeout = async (url: string, options: RequestInit) => {
   const controller = new AbortController();
@@ -10,19 +11,19 @@ const fetchWithTimeout = async (url: string, options: RequestInit) => {
   const startTime = Date.now();
 
   try {
-    console.log(`[API] ${options.method || 'GET'} ${url}`);
+    if (LOG_API) console.log(`[API] ${options.method || 'GET'} ${url}`);
     timeoutId = setTimeout(() => {
-      console.log(`[API] TIMEOUT ${Date.now() - startTime}ms`);
+      if (LOG_API) console.log(`[API] TIMEOUT ${Date.now() - startTime}ms`);
       controller.abort();
     }, TIMEOUT_MS);
 
     const response = await fetch(url, { ...options, signal: controller.signal });
     const elapsed = Date.now() - startTime;
-    console.log(`[API] ${response.status} (${elapsed}ms)`);
+    if (LOG_API) console.log(`[API] ${response.status} (${elapsed}ms)`);
     return response;
   } catch (err) {
     const elapsed = Date.now() - startTime;
-    console.log(`[API] Error ${elapsed}ms: ${(err as Error).message}`);
+    if (LOG_API) console.log(`[API] Error ${elapsed}ms: ${(err as Error).message}`);
     throw err;
   } finally {
     clearTimeout(timeoutId);
@@ -31,8 +32,8 @@ const fetchWithTimeout = async (url: string, options: RequestInit) => {
 
 export const loginService = async (email: string, password: string) => {
   try {
-    console.log(`[LOGIN] ${email}`);
-    console.log(`[LOGIN] Timeout: ${TIMEOUT_MS}ms`);
+    if (LOG_API) console.log(`[LOGIN] ${email}`);
+    if (LOG_API) console.log(`[LOGIN] Timeout: ${TIMEOUT_MS}ms`);
     const res = await fetchWithTimeout(`${API_BASE}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -56,7 +57,8 @@ export const loginService = async (email: string, password: string) => {
   } catch (error) {
     const msg = (error as Error).message;
     if (msg.includes('Aborted')) {
-      throw new Error(`Timeout - Backend tidak merespons. Cek: 1) Backend jalan (php artisan serve)? 2) Device & PC sama network? 3) Ping ${API_CONFIG.LOCAL_PC_IP}?`);
+      const hostHint = API_CONFIG.DEV_HOST || 'localhost';
+      throw new Error(`Timeout - Backend tidak merespons. Cek: 1) Backend jalan (php artisan serve)? 2) Device & PC sama network? 3) Ping ${hostHint}?`);
     }
     throw error;
   }

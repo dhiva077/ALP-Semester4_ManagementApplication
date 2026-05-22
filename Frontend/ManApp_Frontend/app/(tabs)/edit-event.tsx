@@ -5,15 +5,27 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
+import { fetchEvents, updateEvent } from '../../src/services/eventService';
+
+const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const YEARS = Array.from({ length: 31 }, (_, i) => 2020 + i);
+
+const LOCATION_OPTIONS = [
+  'Dian Auditorium UC Makassar Lt7',
+  'Lapangan Basket UC Makassar',
+  'Classroom A606',
+  'Classroom A508',
+];
 
 interface SelectedFile {
   name: string;
@@ -26,26 +38,84 @@ export default function EditEvent() {
 
   const initialEventName = typeof params.eventName === 'string' ? params.eventName : '';
   const initialEventDate = typeof params.eventDate === 'string' ? params.eventDate : '';
+  const initialEventId = typeof params.eventId === 'string' ? Number(params.eventId) : undefined;
 
   const [picName, setPicName] = useState('');
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [location, setLocation] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [startTime, setStartTime] = useState('00:00');
+  const [endTime, setEndTime] = useState('00:00');
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [tempMonth, setTempMonth] = useState(new Date().getMonth());
+  const [tempYear, setTempYear] = useState(new Date().getFullYear());
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [tempStartHour, setTempStartHour] = useState(0);
+  const [tempStartMinute, setTempStartMinute] = useState(0);
+  const [tempEndHour, setTempEndHour] = useState(0);
+  const [tempEndMinute, setTempEndMinute] = useState(0);
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
   const [description, setDescription] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [originalEventId, setOriginalEventId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
 
-  const STORAGE_KEY = 'MANAPP_EVENTS';
+  const handleConfirmPicker = () => {
+    setCalendarDate(new Date(tempYear, tempMonth, 1));
+    setShowPicker(false);
+  };
+
+  const formatTimeParts = (hour: number, minute: number) => {
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  };
+
+  const parseTimeParts = (value: string) => {
+    const [hourStr, minuteStr] = value.split(':');
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+    return {
+      hour: Number.isNaN(hour) ? 0 : hour,
+      minute: Number.isNaN(minute) ? 0 : minute,
+    };
+  };
+
+  const isEarlierThan = (a: { hour: number; minute: number }, b: { hour: number; minute: number }) => {
+    if (a.hour !== b.hour) return a.hour < b.hour;
+    return a.minute < b.minute;
+  };
+
+  const getEventDate = (event: any) => {
+    const start = event?.start_time || '';
+    return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+  };
+
+  const getEventTime = (value?: string) => {
+    if (!value) return '00:00';
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    if (Number.isNaN(parsed.getTime())) {
+      const fallback = value.split(' ')[1] || '';
+      return fallback.slice(0, 5) || '00:00';
+    }
+    return `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`;
+  };
 
   const handleBackToChecklist = () => {
     router.replace({
-      pathname: '/checklist',
+      pathname: '/(tabs)/checklist',
       params: { eventName: eventName, eventDate: eventDate },
     });
+  };
+
+  const handleBackToPenyimpanan = () => {
+    router.replace('/(tabs)/penyimpanan');
   };
 
   const checkIsLocked = (dateStr: string) => {
@@ -58,38 +128,71 @@ export default function EditEvent() {
     return diffDays <= 7;
   };
 
+  const isValidTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+  const renderCalendarDays = () => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const shiftFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    let days = [];
+    for (let i = 0; i < shiftFirstDay; i++) days.push(<View key={`empty-${i}`} style={styles.dateCell} />);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isSelected = eventDate === dateStr;
+      const isToday = dateStr === todayStr;
+      days.push(
+        <TouchableOpacity
+          key={d}
+          style={[styles.dateCell, isSelected && styles.selectedDateCell, isToday && styles.todayDateCell]}
+          onPress={() => {
+            setEventDate(dateStr);
+            setShowDateModal(false);
+          }}
+        >
+          <Text style={[styles.dateText, isSelected && styles.selectedDateText, isToday && styles.todayDateText]}>{d}</Text>
+        </TouchableOpacity>
+      );
+    }
+    return days;
+  };
+
   useEffect(() => {
     const loadExistingEvent = async () => {
-      if (!initialEventDate || !initialEventName) {
+      if (!initialEventDate && !initialEventName && !initialEventId) {
         setLoading(false);
         return;
       }
       try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        const savedEvents = stored ? JSON.parse(stored) : {};
-        const eventList = savedEvents[initialEventDate] || [];
-        const foundEvent = eventList.find((item: any) => item.title === initialEventName);
+        const events = await fetchEvents();
+        let foundEvent = null;
+
+        if (initialEventId) {
+          foundEvent = events.find((item: any) => Number(item.id) === Number(initialEventId));
+        }
+
+        if (!foundEvent && initialEventName && initialEventDate) {
+          foundEvent = events.find((item: any) => item.name === initialEventName && getEventDate(item) === initialEventDate);
+        }
+
+        if (!foundEvent && initialEventName) {
+          foundEvent = events.find((item: any) => item.name === initialEventName);
+        }
 
         if (foundEvent) {
-          if (!foundEvent.picName) {
-            const randomPIC = Math.random() < 0.5 ? 'Dylon' : 'Fathir';
-            setPicName(randomPIC);
-          } else {
-            setPicName(foundEvent.picName);
-          }
-
-          setEventName(foundEvent.title);
-          setEventDate(initialEventDate);
-          setLocation(foundEvent.location || '');
-          const [start, end] = foundEvent.time?.split(' - ') || ['', ''];
-          setStartTime(start || '');
-          setEndTime(end || '');
-          setOriginalEventId(foundEvent.id);
-          setDescription(foundEvent.description || '');
-          if (Array.isArray(foundEvent.files)) {
-            setSelectedFiles(foundEvent.files);
-          }
-          setIsLocked(checkIsLocked(initialEventDate));
+          setPicName(foundEvent?.user?.name || '');
+          setEventName(foundEvent?.name || '');
+          setEventDate(getEventDate(foundEvent));
+          setLocation(foundEvent?.location || '');
+          setStartTime(getEventTime(foundEvent?.start_time));
+          setEndTime(getEventTime(foundEvent?.end_time));
+          setOriginalEventId(foundEvent?.id ?? null);
+          setDescription(foundEvent?.description || '');
+          setIsLocked(checkIsLocked(getEventDate(foundEvent)));
         }
       } catch (error) {
         console.error('Failed to load event', error);
@@ -98,7 +201,7 @@ export default function EditEvent() {
       }
     };
     loadExistingEvent();
-  }, [initialEventDate, initialEventName]);
+  }, [initialEventDate, initialEventName, initialEventId]);
 
   const handlePickDocument = async () => {
     try {
@@ -121,32 +224,27 @@ export default function EditEvent() {
   };
 
   const validateAndSave = async () => {
+    if (!isValidTime(startTime) || !isValidTime(endTime)) {
+      Alert.alert('Perhatian', 'Format jam harus 00:00.');
+      return;
+    }
+    if (!originalEventId) {
+      Alert.alert('Gagal', 'Event tidak ditemukan.');
+      return;
+    }
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      const savedEvents = stored ? JSON.parse(stored) : {};
-      
-      const updatedEvent = {
-        id: originalEventId,
-        title: eventName,
-        location: location,
-        time: endTime ? `${startTime} - ${endTime}` : startTime,
-        color: isLocked ? '#606C38' : '#FF8C00',
-        picName: picName,
-        description: description,
-        files: selectedFiles,
+      const payload = {
+        name: eventName,
+        description: description || null,
+        start_time: `${eventDate} ${startTime}:00`,
+        end_time: `${eventDate} ${endTime}:00`,
+        location,
       };
 
-      const currentDayEvents = savedEvents[eventDate] || [];
-      const index = currentDayEvents.findIndex((item: any) => item.id === originalEventId);
-
-      if (index > -1) {
-        currentDayEvents[index] = updatedEvent;
-      }
-
-      savedEvents[eventDate] = currentDayEvents;
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(savedEvents));
-      Alert.alert('Sukses', 'Data berhasil diperbarui.');
-      handleBackToChecklist();
+      await updateEvent(originalEventId, payload);
+      Alert.alert('Sukses', 'Data berhasil diperbarui.', [
+        { text: 'OK', onPress: () => handleBackToPenyimpanan() },
+      ]);
     } catch (error) {
       Alert.alert('Gagal', 'Terjadi kesalahan saat menyimpan.');
     }
@@ -185,7 +283,7 @@ export default function EditEvent() {
           <TextInput
             value={picName}
             onChangeText={setPicName}
-            editable={!isLocked}
+            editable={false}
             style={[styles.input, styles.boldText, isLocked && styles.textDisabled]}
             placeholder="Nama PIC Event"
           />
@@ -202,51 +300,93 @@ export default function EditEvent() {
           />
         </View>
 
-        <View style={[styles.inputContainer, isLocked && styles.disabledInput]}>
+        <TouchableOpacity
+          style={[styles.inputContainer, isLocked && styles.disabledInput]}
+          disabled={isLocked}
+          onPress={() => setShowDateModal(true)}
+        >
           <Ionicons name="calendar-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
-          <TextInput
-            value={eventDate}
-            onChangeText={setEventDate}
-            editable={!isLocked}
-            style={[styles.input, styles.boldText, isLocked && styles.textDisabled]}
-            placeholder="YYYY-MM-DD"
-          />
+          <Text
+            style={[
+              styles.input,
+              styles.boldText,
+              !eventDate && styles.placeholderText,
+              isLocked && styles.textDisabled,
+            ]}
+          >
+            {eventDate || 'Pilih Tanggal Event'}
+          </Text>
           {isLocked && <Ionicons name="lock-closed" size={16} color="#AAA" />}
-        </View>
+        </TouchableOpacity>
 
-        <View style={[styles.inputContainer, isLocked && styles.disabledInput]}>
+        <TouchableOpacity
+          style={[styles.inputContainer, isLocked && styles.disabledInput]}
+          disabled={isLocked}
+          onPress={() => setShowLocationModal(true)}
+        >
           <Ionicons name="location-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
-          <TextInput
-            value={location}
-            onChangeText={setLocation}
-            editable={!isLocked}
-            style={[styles.input, styles.boldText, isLocked && styles.textDisabled]}
-            placeholder="Lokasi Event"
-          />
-        </View>
+          <Text
+            style={[
+              styles.input,
+              styles.boldText,
+              !location && styles.placeholderText,
+              isLocked && styles.textDisabled,
+            ]}
+          >
+            {location || 'Pilih Lokasi Event'}
+          </Text>
+          {isLocked && <Ionicons name="lock-closed" size={16} color="#AAA" />}
+        </TouchableOpacity>
 
         <View style={styles.timeRow}>
-          <View style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}>
+          <TouchableOpacity
+            style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}
+            disabled={isLocked}
+            onPress={() => {
+              const { hour, minute } = startTime ? parseTimeParts(startTime) : { hour: 0, minute: 0 };
+              setTempStartHour(hour);
+              setTempStartMinute(minute);
+              setShowStartTimePicker(true);
+            }}
+          >
             <Ionicons name="time-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
-            <TextInput
-              value={startTime}
-              onChangeText={setStartTime}
-              editable={!isLocked}
-              placeholder="Mulai"
-              style={[styles.input, styles.boldText, isLocked && styles.textDisabled]}
-            />
-          </View>
+            <Text
+              style={[
+                styles.input,
+                styles.boldText,
+                startTime === '00:00' && styles.placeholderText,
+                isLocked && styles.textDisabled,
+              ]}
+            >
+              {startTime}
+            </Text>
+          </TouchableOpacity>
           <Text style={styles.dash}>-</Text>
-          <View style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}>
+          <TouchableOpacity
+            style={[styles.inputContainer, { flex: 1 }, isLocked && styles.disabledInput]}
+            disabled={isLocked}
+            onPress={() => {
+              const startParts = parseTimeParts(startTime || '00:00');
+              const endParts = endTime ? parseTimeParts(endTime) : startParts;
+              const safeHour = Math.max(endParts.hour, startParts.hour);
+              const safeMinute = safeHour === startParts.hour ? Math.max(endParts.minute, startParts.minute) : endParts.minute;
+              setTempEndHour(safeHour);
+              setTempEndMinute(safeMinute);
+              setShowEndTimePicker(true);
+            }}
+          >
             <Ionicons name="time-outline" size={20} color={isLocked ? '#AAA' : '#8D6E63'} style={styles.icon} />
-            <TextInput
-              value={endTime}
-              onChangeText={setEndTime}
-              editable={!isLocked}
-              placeholder="Selesai"
-              style={[styles.input, styles.boldText, isLocked && styles.textDisabled]}
-            />
-          </View>
+            <Text
+              style={[
+                styles.input,
+                styles.boldText,
+                endTime === '00:00' && styles.placeholderText,
+                isLocked && styles.textDisabled,
+              ]}
+            >
+              {endTime}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionLabel}>Detail & Berkas</Text>
@@ -286,6 +426,228 @@ export default function EditEvent() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={showStartTimePicker} transparent animationType="fade" onRequestClose={() => setShowStartTimePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerCard}>
+            <Text style={styles.timePickerTitle}>Pilih Jam Mulai</Text>
+            <View style={styles.timePickerListRow}>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const isActive = index === tempStartHour;
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempStartHour(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute, index) => {
+                  const isActive = index === tempStartMinute;
+                  return (
+                    <TouchableOpacity
+                      key={minute}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempStartMinute(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {minute}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            <View style={styles.timePickerActions}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowStartTimePicker(false)}>
+                <Text style={styles.btnSecondaryText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={() => {
+                  setShowStartTimePicker(false);
+                  const nextStart = { hour: tempStartHour, minute: tempStartMinute };
+                  setStartTime(formatTimeParts(nextStart.hour, nextStart.minute));
+
+                  const currentEnd = parseTimeParts(endTime || '00:00');
+                  if (isEarlierThan(currentEnd, nextStart)) {
+                    setEndTime(formatTimeParts(nextStart.hour, nextStart.minute));
+                  }
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>Pilih</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEndTimePicker} transparent animationType="fade" onRequestClose={() => setShowEndTimePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerCard}>
+            <Text style={styles.timePickerTitle}>Pilih Jam Selesai</Text>
+            <View style={styles.timePickerListRow}>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const startParts = parseTimeParts(startTime || '00:00');
+                  if (index < startParts.hour) return null;
+                  const isActive = index === tempEndHour;
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempEndHour(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute, index) => {
+                  const startParts = parseTimeParts(startTime || '00:00');
+                  if (tempEndHour === startParts.hour && index < startParts.minute) return null;
+                  const isActive = index === tempEndMinute;
+                  return (
+                    <TouchableOpacity
+                      key={minute}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempEndMinute(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {minute}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            <View style={styles.timePickerActions}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowEndTimePicker(false)}>
+                <Text style={styles.btnSecondaryText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={() => {
+                  setShowEndTimePicker(false);
+                  setEndTime(formatTimeParts(tempEndHour, tempEndMinute));
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>Pilih</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showDateModal} transparent animationType="fade" onRequestClose={() => setShowDateModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.calendarCard}>
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1))}>
+                <Ionicons name="chevron-back" size={20} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.dropdownBtn}
+                onPress={() => {
+                  setTempMonth(calendarDate.getMonth());
+                  setTempYear(calendarDate.getFullYear());
+                  setShowPicker(true);
+                }}
+              >
+                <Text style={styles.calendarTitle}>{MONTHS[calendarDate.getMonth()]} {calendarDate.getFullYear()}</Text>
+                <Ionicons name="caret-down" size={14} color="#fff" style={{ marginLeft: 5 }} />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1))}>
+                <Ionicons name="chevron-forward" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.calendarBody}>
+              <View style={styles.weekRow}>{['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day, i) => <Text key={i} style={styles.dayLabel}>{day}</Text>)}</View>
+              <View style={styles.dateGrid}>{renderCalendarDays()}</View>
+            </View>
+
+            <TouchableOpacity onPress={() => setShowDateModal(false)} style={styles.closeBtn}>
+              <Text style={{ color: '#FF8C00', fontWeight: 'bold' }}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Modal visible={showPicker} transparent animationType="slide" onRequestClose={() => setShowPicker(false)}>
+            <View style={styles.pickerOverlay}>
+              <View style={styles.modernPickerCard}>
+                <View style={styles.pickerHeaderIndicator} />
+                <Text style={styles.pickerModalTitle}>Pilih Periode</Text>
+
+                <View style={styles.pickerContentRow}>
+                  <View style={styles.pickerCol}>
+                    <Text style={styles.colLabel}>Bulan</Text>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollPadding}>
+                      {MONTHS.map((m, idx) => (
+                        <TouchableOpacity
+                          key={m}
+                          style={[styles.modernPickerItem, tempMonth === idx && styles.modernActiveItem]}
+                          onPress={() => setTempMonth(idx)}
+                        >
+                          <Text style={[styles.modernPickerText, tempMonth === idx && styles.modernActiveText]}>{m}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                  <View style={styles.pickerDivider} />
+                  <View style={styles.pickerCol}>
+                    <Text style={styles.colLabel}>Tahun</Text>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollPadding}>
+                      {YEARS.map((y) => (
+                        <TouchableOpacity
+                          key={y}
+                          style={[styles.modernPickerItem, tempYear === y && styles.modernActiveItem]}
+                          onPress={() => setTempYear(y)}
+                        >
+                          <Text style={[styles.modernPickerText, tempYear === y && styles.modernActiveText]}>{y}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+
+                <View style={styles.pickerActionRow}>
+                  <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowPicker(false)}>
+                    <Text style={styles.btnSecondaryText}>Batal</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.btnPrimary} onPress={handleConfirmPicker}>
+                    <Text style={styles.btnPrimaryText}>Terapkan</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </View>
+      </Modal>
+
+      <Modal visible={showLocationModal} transparent animationType="fade" onRequestClose={() => setShowLocationModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.locationModal}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#4E342E', marginBottom: 15 }}>Pilih Lokasi</Text>
+            {LOCATION_OPTIONS.map((opt) => (
+              <TouchableOpacity key={opt} style={styles.optionItem} onPress={() => { setLocation(opt); setShowLocationModal(false); }}>
+                <Text style={styles.optionText}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => setShowLocationModal(false)} style={{ marginTop: 15, alignSelf: 'center' }}><Text style={{ color: '#FF8C00', fontWeight: 'bold' }}>Batal</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -306,7 +668,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginTop: 10,
+    marginTop: Platform.OS === 'android' ? 30 : 10,
     marginBottom: 10,
   },
 
@@ -411,6 +773,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  placeholderText: {
+    color: '#A1887F',
+  },
+
   descriptionInput: {
     flex: 1,
     textAlignVertical: 'top',
@@ -483,5 +849,306 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFF',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  calendarCard: {
+    width: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    overflow: 'hidden',
+    elevation: 20,
+  },
+
+  calendarHeader: {
+    backgroundColor: '#FF8F29',
+    padding: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  dropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+
+  calendarTitle: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
+  calendarBody: {
+    padding: 15,
+  },
+
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  dayLabel: {
+    width: '14%',
+    textAlign: 'center',
+    color: '#5C2C00',
+    fontWeight: 'bold',
+  },
+
+  dateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  dateCell: {
+    width: '14%',
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'center',
+  },
+
+  dateText: {
+    color: '#5C2C00',
+  },
+
+  selectedDateCell: {
+    backgroundColor: '#FF8C00',
+    borderRadius: 10,
+  },
+
+  todayDateCell: {
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+    borderRadius: 10,
+  },
+
+  selectedDateText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+
+  todayDateText: {
+    fontWeight: 'bold',
+  },
+
+  closeBtn: {
+    padding: 15,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderColor: '#EEE',
+  },
+
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+
+  modernPickerCard: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+    paddingTop: 10,
+    height: '60%',
+    elevation: 25,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -10,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+
+  pickerHeaderIndicator: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 10,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+
+  pickerModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#4E342E',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+
+  pickerContentRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  pickerCol: {
+    flex: 1,
+  },
+
+  colLabel: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#A1887F',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+
+  scrollPadding: {
+    paddingBottom: 20,
+  },
+
+  pickerDivider: {
+    width: 1,
+    backgroundColor: '#F0F0F0',
+    marginHorizontal: 10,
+    height: '100%',
+  },
+
+  modernPickerItem: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginVertical: 4,
+    borderRadius: 12,
+  },
+
+  modernActiveItem: {
+    backgroundColor: '#FFF3E0',
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+  },
+
+  modernPickerText: {
+    fontSize: 16,
+    color: '#8D6E63',
+    fontWeight: '500',
+  },
+
+  modernActiveText: {
+    color: '#FF8C00',
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+
+  pickerActionRow: {
+    flexDirection: 'row',
+    gap: 15,
+    marginTop: 20,
+  },
+
+  locationModal: {
+    width: '80%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 10,
+  },
+
+  optionItem: {
+    paddingVertical: 15,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#EEE',
+  },
+
+  optionText: {
+    color: '#4E342E',
+    fontSize: 15,
+  },
+
+  timePickerCard: {
+    width: '85%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 10,
+  },
+
+  timePickerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4E342E',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+
+  timePickerListRow: {
+    flexDirection: 'row',
+    gap: 12,
+    maxHeight: 220,
+  },
+
+  timePickerColumn: {
+    flex: 1,
+    backgroundColor: '#FDF5E6',
+    borderRadius: 12,
+    paddingVertical: 8,
+  },
+
+  timePickerItem: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+
+  timePickerItemActive: {
+    backgroundColor: '#FF8C00',
+    marginHorizontal: 10,
+    borderRadius: 10,
+  },
+
+  timePickerItemText: {
+    color: '#5C2C00',
+    fontWeight: '600',
+  },
+
+  timePickerItemTextActive: {
+    color: '#FFF',
+  },
+
+  timePickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+
+  btnSecondary: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+  },
+
+  btnSecondaryText: {
+    color: '#8D6E63',
+    fontWeight: 'bold',
+  },
+
+  btnPrimary: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FF8C00',
+    alignItems: 'center',
+  },
+
+  btnPrimaryText: {
+    color: '#FFF',
+    fontWeight: 'bold',
   },
 });

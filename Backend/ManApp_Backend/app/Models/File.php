@@ -47,16 +47,22 @@ class File extends Model
         'event_id',
         'form_checklist_sebelum_acara',
         'status_form_checklist_sebelum_acara_id',
+        'revisi_form_checklist_sebelum_acara',
         'surat_perjanjian_kerjasama',
         'status_surat_perjanjian_kerjasama_id',
+        'revisi_surat_perjanjian_kerjasama',
         'invoice',
         'status_invoice_id',
+        'revisi_invoice',
         'lembar_disposisi',
         'status_lembar_disposisi_id',
+        'revisi_lembar_disposisi',
         'surat_izin_loading',
         'status_surat_izin_loading_id',
+        'revisi_surat_izin_loading',
         'form_checklist_setelah_acara',
         'status_form_checklist_setelah_acara_id',
+        'revisi_form_checklist_setelah_acara',
     ];
 
     /**

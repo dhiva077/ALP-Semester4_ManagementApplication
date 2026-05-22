@@ -1,6 +1,7 @@
 import { API_CONFIG } from '../config/api';
 
 const TIMEOUT_MS = 30000;
+const LOG_API = false;
 
 export const API_BASE = API_CONFIG.BASE_URL;
 export const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
@@ -11,19 +12,19 @@ export const fetchWithTimeout = async (url: string, options: RequestInit) => {
   const startTime = Date.now();
 
   try {
-    console.log(`[API] ${options.method || 'GET'} ${url}`);
+    if (LOG_API) console.log(`[API] ${options.method || 'GET'} ${url}`);
     timeoutId = setTimeout(() => {
-      console.log(`[API] TIMEOUT ${Date.now() - startTime}ms`);
+      if (LOG_API) console.log(`[API] TIMEOUT ${Date.now() - startTime}ms`);
       controller.abort();
     }, TIMEOUT_MS);
 
     const response = await fetch(url, { ...options, signal: controller.signal });
     const elapsed = Date.now() - startTime;
-    console.log(`[API] ${response.status} (${elapsed}ms)`);
+    if (LOG_API) console.log(`[API] ${response.status} (${elapsed}ms)`);
     return response;
   } catch (err) {
     const elapsed = Date.now() - startTime;
-    console.log(`[API] Error ${elapsed}ms: ${(err as Error).message}`);
+    if (LOG_API) console.log(`[API] Error ${elapsed}ms: ${(err as Error).message}`);
     throw err;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);

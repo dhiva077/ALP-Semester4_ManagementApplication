@@ -5,12 +5,12 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   TextInput, 
-  SafeAreaView, 
   ScrollView,
   Alert,
   Modal,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -41,8 +41,8 @@ export default function TambahEvent() {
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [location, setLocation] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [startTime, setStartTime] = useState('00:00');
+  const [endTime, setEndTime] = useState('00:00');
   const [description, setDescription] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -52,18 +52,27 @@ export default function TambahEvent() {
   const [showDateModal, setShowDateModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [tempMonth, setTempMonth] = useState(new Date().getMonth());
   const [tempYear, setTempYear] = useState(new Date().getFullYear());
+  const [tempStartHour, setTempStartHour] = useState(0);
+  const [tempStartMinute, setTempStartMinute] = useState(0);
+  const [tempEndHour, setTempEndHour] = useState(0);
+  const [tempEndMinute, setTempEndMinute] = useState(0);
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 
   const resetForm = () => {
     setPicName(currentUser?.name || '');
     setEventName('');
     setEventDate('');
     setLocation('');
-    setStartTime('');
-    setEndTime('');
+    setStartTime('00:00');
+    setEndTime('00:00');
     setDescription('');
     setSelectedFiles([]);
     setCalendarDate(new Date());
@@ -113,7 +122,24 @@ export default function TambahEvent() {
     setShowPicker(false);
   };
 
-  const normalizeName = (value: string) => value.trim().toLowerCase();
+  const formatTimeParts = (hour: number, minute: number) => {
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  };
+
+  const parseTimeParts = (value: string) => {
+    const [hourStr, minuteStr] = value.split(':');
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+    return {
+      hour: Number.isNaN(hour) ? 0 : hour,
+      minute: Number.isNaN(minute) ? 0 : minute,
+    };
+  };
+
+  const isEarlierThan = (a: { hour: number; minute: number }, b: { hour: number; minute: number }) => {
+    if (a.hour !== b.hour) return a.hour < b.hour;
+    return a.minute < b.minute;
+  };
 
   const combineDateTime = (date: string, time: string) => {
     return `${date} ${time}:00`;
@@ -131,15 +157,6 @@ export default function TambahEvent() {
     }
 
     try {
-      if (selectedFiles.length > 0) {
-        const eventKeyword = normalizeName(eventName);
-        const invalidFile = selectedFiles.find((file) => !normalizeName(file.name).includes(eventKeyword));
-        if (invalidFile) {
-          Alert.alert('Gagal', `Nama file harus mengandung kata: "${eventName}"`);
-          return;
-        }
-      }
-
       setIsSubmitting(true);
 
       const payload = {
@@ -165,8 +182,15 @@ export default function TambahEvent() {
         }
       }
 
-      Alert.alert('Sukses', 'Event berhasil ditambahkan.');
-      resetForm();
+      Alert.alert('Sukses', 'Event berhasil ditambahkan.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            resetForm();
+            router.replace('/(tabs)/dashboard');
+          },
+        },
+      ]);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Terjadi masalah penyimpanan.';
       Alert.alert('Gagal', msg);
@@ -181,22 +205,25 @@ export default function TambahEvent() {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDay = new Date(year, month, 1).getDay();
     const shiftFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     let days = [];
     for (let i = 0; i < shiftFirstDay; i++) days.push(<View key={`empty-${i}`} style={styles.dateCell} />);
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const isSelected = eventDate === dateStr;
+      const isToday = dateStr === todayStr;
       days.push(
         <TouchableOpacity 
           key={d} 
-          style={[styles.dateCell, isSelected && styles.selectedDateCell]} 
+          style={[styles.dateCell, isSelected && styles.selectedDateCell, isToday && styles.todayDateCell]} 
           onPress={() => { 
             setEventDate(dateStr); 
             setShowDateModal(false); 
           }}
         >
-          <Text style={[styles.dateText, isSelected && styles.selectedDateText]}>{d}</Text>
+          <Text style={[styles.dateText, isSelected && styles.selectedDateText, isToday && styles.todayDateText]}>{d}</Text>
         </TouchableOpacity>
       );
     }
@@ -217,7 +244,14 @@ export default function TambahEvent() {
 
         <View style={styles.inputContainer}>
           <Ionicons name="people-outline" size={20} color="#8D6E63" style={styles.icon} />
-          <TextInput value={picName} onChangeText={setPicName} placeholder="Nama PIC Event" style={[styles.input, styles.boldText]} placeholderTextColor="#A1887F" />
+          <TextInput
+            value={picName}
+            onChangeText={setPicName}
+            editable={false}
+            placeholder="Nama PIC Event"
+            style={[styles.input, styles.boldText, styles.disabledInputText]}
+            placeholderTextColor="#A1887F"
+          />
         </View>
 
         <View style={styles.inputContainer}>
@@ -236,15 +270,38 @@ export default function TambahEvent() {
         </TouchableOpacity>
 
         <View style={styles.timeRow}>
-          <View style={[styles.inputContainer, { flex: 1 }]}>
+          <TouchableOpacity
+            style={[styles.inputContainer, { flex: 1 }]}
+            onPress={() => {
+              const { hour, minute } = startTime ? parseTimeParts(startTime) : { hour: 0, minute: 0 };
+              setTempStartHour(hour);
+              setTempStartMinute(minute);
+              setShowStartTimePicker(true);
+            }}
+          >
             <Ionicons name="time-outline" size={20} color="#8D6E63" style={styles.icon} />
-            <TextInput value={startTime} onChangeText={setStartTime} placeholder="Mulai" style={[styles.input, styles.boldText]} placeholderTextColor="#A1887F" />
-          </View>
+            <Text style={[styles.input, styles.boldText, startTime === '00:00' && styles.placeholderText]}>
+              {startTime}
+            </Text>
+          </TouchableOpacity>
           <Text style={styles.dash}>-</Text>
-          <View style={[styles.inputContainer, { flex: 1 }]}>
+          <TouchableOpacity
+            style={[styles.inputContainer, { flex: 1 }]}
+            onPress={() => {
+              const startParts = parseTimeParts(startTime || '00:00');
+              const endParts = endTime ? parseTimeParts(endTime) : startParts;
+              const safeHour = Math.max(endParts.hour, startParts.hour);
+              const safeMinute = safeHour === startParts.hour ? Math.max(endParts.minute, startParts.minute) : endParts.minute;
+              setTempEndHour(safeHour);
+              setTempEndMinute(safeMinute);
+              setShowEndTimePicker(true);
+            }}
+          >
             <Ionicons name="time-outline" size={20} color="#8D6E63" style={styles.icon} />
-            <TextInput value={endTime} onChangeText={setEndTime} placeholder="Selesai" style={[styles.input, styles.boldText]} placeholderTextColor="#A1887F" />
-          </View>
+            <Text style={[styles.input, styles.boldText, endTime === '00:00' && styles.placeholderText]}>
+              {endTime}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionLabel}>Detail & Berkas</Text>
@@ -384,6 +441,128 @@ export default function TambahEvent() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={showStartTimePicker} transparent animationType="fade" onRequestClose={() => setShowStartTimePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerCard}>
+            <Text style={styles.timePickerTitle}>Pilih Jam Mulai</Text>
+            <View style={styles.timePickerListRow}>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const isActive = index === tempStartHour;
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempStartHour(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute, index) => {
+                  const isActive = index === tempStartMinute;
+                  return (
+                    <TouchableOpacity
+                      key={minute}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempStartMinute(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {minute}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            <View style={styles.timePickerActions}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowStartTimePicker(false)}>
+                <Text style={styles.btnSecondaryText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={() => {
+                  setShowStartTimePicker(false);
+                  const nextStart = { hour: tempStartHour, minute: tempStartMinute };
+                  setStartTime(formatTimeParts(nextStart.hour, nextStart.minute));
+
+                  const currentEnd = parseTimeParts(endTime || '00:00');
+                  if (isEarlierThan(currentEnd, nextStart)) {
+                    setEndTime(formatTimeParts(nextStart.hour, nextStart.minute));
+                  }
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>Pilih</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEndTimePicker} transparent animationType="fade" onRequestClose={() => setShowEndTimePicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.timePickerCard}>
+            <Text style={styles.timePickerTitle}>Pilih Jam Selesai</Text>
+            <View style={styles.timePickerListRow}>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const startParts = parseTimeParts(startTime || '00:00');
+                  if (index < startParts.hour) return null;
+                  const isActive = index === tempEndHour;
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempEndHour(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <ScrollView style={styles.timePickerColumn} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute, index) => {
+                  const startParts = parseTimeParts(startTime || '00:00');
+                  if (tempEndHour === startParts.hour && index < startParts.minute) return null;
+                  const isActive = index === tempEndMinute;
+                  return (
+                    <TouchableOpacity
+                      key={minute}
+                      style={[styles.timePickerItem, isActive && styles.timePickerItemActive]}
+                      onPress={() => setTempEndMinute(index)}
+                    >
+                      <Text style={[styles.timePickerItemText, isActive && styles.timePickerItemTextActive]}>
+                        {minute}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            <View style={styles.timePickerActions}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowEndTimePicker(false)}>
+                <Text style={styles.btnSecondaryText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={() => {
+                  setShowEndTimePicker(false);
+                  setEndTime(formatTimeParts(tempEndHour, tempEndMinute));
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>Pilih</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -391,7 +570,7 @@ export default function TambahEvent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FDF5E6',
+    backgroundColor: '#FEF2DB',
   },
 
   header: {
@@ -477,6 +656,10 @@ const styles = StyleSheet.create({
 
   placeholderText: {
     color: '#A1887F',
+  },
+
+  disabledInputText: {
+    color: '#8D6E63',
   },
 
   descriptionInput: {
@@ -636,8 +819,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
+  todayDateCell: {
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+    borderRadius: 10,
+  },
+
   selectedDateText: {
     color: '#FFF',
+    fontWeight: 'bold',
+  },
+
+  todayDateText: {
     fontWeight: 'bold',
   },
 
@@ -796,5 +989,60 @@ const styles = StyleSheet.create({
   optionText: {
     color: '#4E342E',
     fontSize: 15,
+  },
+
+  timePickerCard: {
+    width: '85%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 10,
+  },
+
+  timePickerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4E342E',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+
+  timePickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+
+  timePickerListRow: {
+    flexDirection: 'row',
+    gap: 12,
+    maxHeight: 220,
+  },
+
+  timePickerColumn: {
+    flex: 1,
+    backgroundColor: '#FDF5E6',
+    borderRadius: 12,
+    paddingVertical: 8,
+  },
+
+  timePickerItem: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+
+  timePickerItemActive: {
+    backgroundColor: '#FF8C00',
+    marginHorizontal: 10,
+    borderRadius: 10,
+  },
+
+  timePickerItemText: {
+    color: '#5C2C00',
+    fontWeight: '600',
+  },
+
+  timePickerItemTextActive: {
+    color: '#FFF',
   },
 });
