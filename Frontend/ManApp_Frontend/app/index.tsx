@@ -11,6 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
+const LOGIN_TTL_MS = 30 * 60 * 1000;
+
 export default function Index() {
   const router = useRouter();
 
@@ -55,7 +57,30 @@ export default function Index() {
           }),
         ]),
       ]).start(async () => {
+        const now = Date.now();
+        const [[, hasSeenWelcome], [, isLoggedIn], [, loginAt]] =
+          await AsyncStorage.multiGet([
+            'hasSeenWelcome',
+            'isLoggedIn',
+            'loginAt',
+          ]);
+
+        const loginAtMs = loginAt ? Number(loginAt) : 0;
+        const stillValid = isLoggedIn === 'true'
+          && loginAtMs > 0
+          && now - loginAtMs <= LOGIN_TTL_MS;
+
         setTimeout(() => {
+          if (stillValid) {
+            router.replace('/(tabs)/dashboard');
+            return;
+          }
+
+          if (hasSeenWelcome === 'true') {
+            router.replace('/(auth)/login');
+            return;
+          }
+
           router.replace('/(auth)/welcome');
         }, 800);
       });

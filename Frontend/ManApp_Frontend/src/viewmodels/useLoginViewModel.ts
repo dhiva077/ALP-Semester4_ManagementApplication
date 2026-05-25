@@ -69,6 +69,7 @@ export default function useLoginViewModel() {
         ['isLoggedIn', 'true'],
         ['authProvider', 'backend'],
         ['user', JSON.stringify(userData)],
+        ['loginAt', String(Date.now())],
       ]);
 
       try {
