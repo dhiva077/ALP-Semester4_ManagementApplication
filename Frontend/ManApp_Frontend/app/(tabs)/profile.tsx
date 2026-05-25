@@ -115,7 +115,7 @@ export default function Profile() {
           text: "Keluar", 
           style: "destructive",
           onPress: async () => {
-            await AsyncStorage.multiRemove(['isLoggedIn', 'authProvider', 'user']);
+            await AsyncStorage.multiRemove(['isLoggedIn', 'authProvider', 'user', 'loginAt']);
             router.replace('/login');
           }
         }

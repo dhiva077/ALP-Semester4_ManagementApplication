@@ -52,6 +52,7 @@ export const loginService = async (email: string, password: string) => {
       ['isLoggedIn', 'true'],
       ['authProvider', 'backend'],
       ['user', JSON.stringify(data.user)],
+      ['loginAt', String(Date.now())],
     ]);
     return data.user;
   } catch (error) {
@@ -81,6 +82,7 @@ export const googleSignInService = async (user: { email?: string; name?: string 
         ['isLoggedIn', 'true'],
         ['authProvider', 'google'],
         ['user', JSON.stringify(userData)],
+        ['loginAt', String(Date.now())],
       ]);
       return userData;
     }
@@ -98,6 +100,7 @@ export const googleSignInService = async (user: { email?: string; name?: string 
       ['isLoggedIn', 'true'],
       ['authProvider', 'google'],
       ['user', JSON.stringify(existing)],
+      ['loginAt', String(Date.now())],
     ]);
     return existing;
   } catch (error) {

@@ -5,6 +5,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import Animated, {
@@ -45,9 +47,11 @@ const tabs = [
 
 export default function CustomTabBar({ state, navigation }: any) {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const TAB_WIDTH = width * 0.9;
   const ITEM_WIDTH = TAB_WIDTH / tabs.length;
+  const bottomOffset = Math.max(12, insets.bottom + 8);
 
   // =========================
   // LOGIKA ACTIVE TAB
@@ -112,7 +116,7 @@ export default function CustomTabBar({ state, navigation }: any) {
   });
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, { bottom: bottomOffset }]}>
       <View
         style={[
           styles.container,
