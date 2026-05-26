@@ -8,23 +8,25 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import useInputFileViewModel from '../../src/viewmodels/useInputFileViewModel';
 import { fetchEvents } from '../../src/services/eventService';
-import { uploadEventPdf } from '../../src/services/fileApi';
+import { fetchFiles, uploadEventPdf } from '../../src/services/fileApi';
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const YEARS = ["2024", "2025", "2026", "2027"];
 
 export default function InputFile() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   
   const eventName = typeof params.eventName === 'string' ? params.eventName : null;
   const eventDate = typeof params.eventDate === 'string' ? params.eventDate : null;
   const fromChecklist = !!params.source;
+  const expectedDocKey = typeof params.docKey === 'string' ? params.docKey : null;
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -47,13 +49,22 @@ export default function InputFile() {
 
   const normalizeName = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
+  const formatDateLocal = (value?: string) => {
+    if (!value) return '';
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    if (Number.isNaN(parsed.getTime())) {
+      return value.split('T')[0]?.split(' ')[0] ?? '';
+    }
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  };
+
   const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string, onClose?: () => void) => {
     setAlertConfig({ visible: true, type, title, message, onClose });
   };
 
   const mapEvent = (event: any) => {
-    const start = event?.start_time || '';
-    const dateOnly = start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+    const dateOnly = formatDateLocal(event?.start_time);
     return {
       id: event.id,
       name: event.name,
@@ -199,6 +210,49 @@ export default function InputFile() {
     }
 
     try {
+      const docMap: { key: string; label: string }[] = [
+        { key: 'form_checklist_sebelum_acara', label: 'Form Checklist Sebelum Acara' },
+        { key: 'surat_perjanjian_kerjasama', label: 'Surat Perjanjian Kerjasama' },
+        { key: 'invoice', label: 'Invoice' },
+        { key: 'lembar_disposisi', label: 'Lembar Disposisi' },
+        { key: 'surat_izin_loading', label: 'Surat Izin Loading' },
+        { key: 'form_checklist_setelah_acara', label: 'Form Checklist Setelah Acara' },
+      ];
+
+      if (expectedDocKey) {
+        const statusKeyMap: Record<string, string> = {
+          form_checklist_sebelum_acara: 'statusFormChecklistSebelumAcara',
+          surat_perjanjian_kerjasama: 'statusSuratPerjanjianKerjasama',
+          invoice: 'statusInvoice',
+          lembar_disposisi: 'statusLembarDisposisi',
+          surat_izin_loading: 'statusSuratIzinLoading',
+          form_checklist_setelah_acara: 'statusFormChecklistSetelahAcara',
+        };
+
+        const toSnake = (value: string) => value.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+        const filesData = await fetchFiles({ force: true });
+        const record = filesData.find((item: any) => String(item.event_id) === String(selectedEvent.id));
+        if (record) {
+          const target = docMap.find((doc) => doc.key === expectedDocKey);
+          if (target) {
+            const statusKey = statusKeyMap[target.key];
+            const resolved = record?.[statusKey] ?? record?.[toSnake(statusKey)];
+            const statusCode = resolved?.code ?? null;
+            const hasFile = !!record?.[target.key];
+            const isFilled = statusCode && statusCode !== 'B';
+
+            if (hasFile && isFilled) {
+              showAlert(
+                'error',
+                'Dokumen Sudah Ada',
+                `Dokumen "${target.label}" sudah tersimpan untuk event ini.\n\nHapus/ubah dokumen yang lama terlebih dahulu sebelum upload ulang.`
+              );
+              return;
+            }
+          }
+        }
+      }
+
       setIsUploading(true);
 
       for (const file of selectedFiles) {
@@ -273,7 +327,13 @@ export default function InputFile() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(140, insets.bottom + 120) },
+        ]}
+      >
         {!eventName && (
           <>
             <Text style={styles.sectionLabel}>Periode Event</Text>
