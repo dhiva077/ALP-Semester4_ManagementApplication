@@ -7,6 +7,7 @@ import {
   TextInput,
   ScrollView,
   Modal,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -33,10 +34,17 @@ export default function Penyimpanan() {
   const [tempMonth, setTempMonth] = useState(currentMonth);
   const [tempYear, setTempYear] = useState(currentYear);
 
-  const getEventDate = (event: any) => {
-    const start = event?.start_time || '';
-    return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+  const formatDateLocal = (value?: string) => {
+    if (!value) return '';
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    if (Number.isNaN(parsed.getTime())) {
+      return value.split('T')[0]?.split(' ')[0] ?? '';
+    }
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
   };
+
+  const getEventDate = (event: any) => formatDateLocal(event?.start_time);
 
   const parseEventTime = (value?: string) => {
     if (!value) return null;
@@ -193,42 +201,43 @@ export default function Penyimpanan() {
         </View>
       </View>
 
-      <ScrollView
+      <FlatList
+        data={filteredEvents}
+        keyExtractor={(item) => `${item.date}-${item.id}`}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(120, insets.bottom + 100) },
         ]}
-      >
-        {filteredEvents.length > 0 ? (
-          filteredEvents.map((item) => (
-            <TouchableOpacity 
-              key={`${item.date}-${item.id}`} 
-              style={styles.eventCard}
-              onPress={() => router.push({
-                pathname: '/checklist',
-                params: { eventName: item.title, eventDate: item.date, eventId: item.id, source: 'penyimpanan' }
-              })}
-            >
-              <View style={styles.cardInfo}>
-                <Text style={styles.eventTitle}>{item.title}</Text>
-                <Text style={styles.eventSubText}>PIC: {item.pic || '-'}</Text>
-                <Text style={styles.eventSubText}>{item.location}</Text>
-                <Text style={styles.eventSubText}>
-                  {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </Text>
-                <Text style={styles.eventSubText}>Pukul {item.time}</Text>
-              </View>
-              <View style={[styles.statusDot, { backgroundColor: item.color }]} />
-            </TouchableOpacity>
-          ))
-        ) : (
+        initialNumToRender={6}
+        windowSize={7}
+        removeClippedSubviews
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.eventCard}
+            onPress={() => router.push({
+              pathname: '/checklist',
+              params: { eventName: item.title, eventDate: item.date, eventId: item.id, source: 'penyimpanan' }
+            })}
+          >
+            <View style={styles.cardInfo}>
+              <Text style={styles.eventTitle}>{item.title}</Text>
+              <Text style={styles.eventSubText}>PIC: {item.pic || '-'}</Text>
+              <Text style={styles.eventSubText}>{item.location}</Text>
+              <Text style={styles.eventSubText}>
+                {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </Text>
+              <Text style={styles.eventSubText}>Pukul {item.time}</Text>
+            </View>
+            <View style={[styles.statusDot, { backgroundColor: item.color }]} />
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            {/* IKON DINAMIS SESUAI SEARCH */}
-            <MaterialCommunityIcons 
-              name={searchQuery ? "calendar-search" : "calendar-blank-outline"} 
-              size={80} 
-              color="#D2B48C" 
+            <MaterialCommunityIcons
+              name={searchQuery ? "calendar-search" : "calendar-blank-outline"}
+              size={80}
+              color="#D2B48C"
             />
             <Text style={styles.emptyText}>
               {searchQuery ? (
@@ -240,8 +249,8 @@ export default function Penyimpanan() {
               )}
             </Text>
           </View>
-        )}
-      </ScrollView>
+        }
+      />
 
       <Modal visible={showPicker} transparent animationType="fade">
         <View style={pickerStyles.overlay}>

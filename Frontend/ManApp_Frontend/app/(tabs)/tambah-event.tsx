@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -36,6 +36,7 @@ interface SelectedFile {
 export default function TambahEvent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const submittingRef = useRef(false);
   
   // Form States
   const [picName, setPicName] = useState('');
@@ -147,6 +148,10 @@ export default function TambahEvent() {
   };
 
   const validateAndSave = async () => {
+    if (submittingRef.current || isSubmitting) {
+      return;
+    }
+
     if (!picName || !eventName || !location || !startTime || !endTime || !eventDate) {
       Alert.alert('Perhatian', 'Mohon lengkapi kolom wajib.');
       return;
@@ -158,6 +163,7 @@ export default function TambahEvent() {
     }
 
     try {
+      submittingRef.current = true;
       setIsSubmitting(true);
 
       const payload = {
@@ -197,6 +203,7 @@ export default function TambahEvent() {
       Alert.alert('Gagal', msg);
     } finally {
       setIsSubmitting(false);
+      submittingRef.current = false;
     }
   };
 

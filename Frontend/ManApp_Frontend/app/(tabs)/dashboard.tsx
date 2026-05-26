@@ -40,6 +40,16 @@ export default function Dashboard() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   };
 
+  const formatDateLocal = (value?: string) => {
+    if (!value) return '';
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    if (Number.isNaN(parsed.getTime())) {
+      return value.split('T')[0]?.split(' ')[0] ?? '';
+    }
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  };
+
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(getTodayStr());
   const [events, setEvents] = useState<EventData>({});
@@ -53,10 +63,7 @@ export default function Dashboard() {
   const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/bottts/png?seed=Ginger&backgroundColor=fef2db';
   const todayStr = getTodayStr();
 
-  const getEventDate = (event: any) => {
-    const start = event?.start_time || '';
-    return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
-  };
+  const getEventDate = (event: any) => formatDateLocal(event?.start_time);
 
   const parseEventTime = (value?: string) => {
     if (!value) return null;

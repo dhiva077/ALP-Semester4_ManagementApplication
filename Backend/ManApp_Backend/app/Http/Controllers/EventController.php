@@ -35,6 +35,21 @@ class EventController extends Controller
             'status_id' => ['required', 'integer', 'exists:status,id'],
         ]);
 
+        $existing = Event::query()
+            ->where('user_id', $validated['user_id'])
+            ->where('name', $validated['name'])
+            ->where('start_time', $validated['start_time'])
+            ->where('end_time', $validated['end_time'])
+            ->where('location', $validated['location'])
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'message' => 'Event sudah ada.',
+                'event' => $existing->load(['user', 'status', 'files']),
+            ], 409);
+        }
+
         $event = Event::create($validated);
         Cache::forget(self::CACHE_KEY);
 

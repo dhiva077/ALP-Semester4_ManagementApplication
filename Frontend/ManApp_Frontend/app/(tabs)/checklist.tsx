@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  TextInput, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
   ScrollView,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,14 +36,24 @@ export default function Checklist() {
   const currentEventName = typeof eventName === 'string' ? eventName : "Detail Event";
   const currentEventDate = typeof eventDate === 'string' ? eventDate : "";
   const sourceFrom = typeof source === 'string' ? source : 'dashboard';
-  const getEventDate = (event: any) => {
-    const start = event?.start_time || '';
-    return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+  const formatDateLocal = (value?: string) => {
+    if (!value) return '';
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    if (Number.isNaN(parsed.getTime())) {
+      return value.split('T')[0]?.split(' ')[0] ?? '';
+    }
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
   };
+
+  const getEventDate = (event: any) => formatDateLocal(event?.start_time);
 
   const loadData = async () => {
     try {
-      const [events, files] = await Promise.all([fetchEvents(), fetchFiles()]);
+      const [events, files] = await Promise.all([
+        fetchEvents(),
+        fetchFiles({ force: true }),
+      ]);
 
       let matched = null;
       if (eventId) {
@@ -153,75 +164,80 @@ export default function Checklist() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {filteredChecklist.length === 0 ? (
+      <FlatList
+        data={filteredChecklist}
+        keyExtractor={(item) => String(item.id)}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        initialNumToRender={8}
+        windowSize={8}
+        removeClippedSubviews
+        renderItem={({ item }) => {
+          const statusCode = getStatusCode(item.statusKey, item.docKey);
+          const filePath = fileRecord?.[item.docKey] || null;
+          const fileUrlFromApi = fileRecord?.[`${item.docKey}_url`] || null;
+          const hasFile = !!filePath && statusCode !== 'B';
+          const path = hasFile ? '/(tabs)/file-detail' : '/(tabs)/input-file';
+          const eventNameValue = currentEvent?.name || currentEventName;
+          const eventDateValue = currentEvent ? getEventDate(currentEvent) : currentEventDate;
+          const eventIdValue = currentEvent?.id || eventId;
+          const revisionComment = fileRecord?.[`revisi_${item.docKey}`] || null;
+
+          return (
+            <TouchableOpacity
+              style={styles.checklistCard}
+              onPress={() => {
+                router.push({
+                  pathname: path,
+                  params: {
+                    title: item.title,
+                    eventName: eventNameValue,
+                    eventDate: eventDateValue,
+                    eventId: eventIdValue,
+                    checklistId: item.id,
+                    docKey: item.docKey,
+                    filePath: filePath || undefined,
+                    fileUrl: buildFileUrl(fileUrlFromApi || filePath) || undefined,
+                    source: sourceFrom,
+                    location: currentEvent?.location || params.location,
+                    pic: currentEvent?.user?.name || params.pic,
+                  }
+                });
+              }}
+            >
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={styles.checklistTitle}>{item.title}</Text>
+                {statusCode === 'R' && revisionComment && (
+                  <Text style={styles.revisionCommentText}>
+                    Catatan: {revisionComment}
+                  </Text>
+                )}
+              </View>
+              <View style={[styles.statusCircle, { backgroundColor: getStatusColor(statusCode) }]} />
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="file-search-outline" size={80} color="#D2B48C" />
             <Text style={styles.emptyText}>
               {'"'}<Text style={{ fontWeight: 'bold' }}>{searchQuery}</Text>{'"'} tidak ditemukan
             </Text>
           </View>
-        ) : (
-          filteredChecklist.map((item) => {
-            const statusCode = getStatusCode(item.statusKey, item.docKey);
-            const filePath = fileRecord?.[item.docKey] || null;
-            const fileUrlFromApi = fileRecord?.[`${item.docKey}_url`] || null;
-            const hasFile = !!filePath && statusCode !== 'B';
-            const path = hasFile ? '/(tabs)/file-detail' : '/(tabs)/input-file';
-            const eventNameValue = currentEvent?.name || currentEventName;
-            const eventDateValue = currentEvent ? getEventDate(currentEvent) : currentEventDate;
-            const eventIdValue = currentEvent?.id || eventId;
-
-            const revisionComment = fileRecord?.[`revisi_${item.docKey}`] || null;
-
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.checklistCard}
-                onPress={() => {
-                  router.push({
-                    pathname: path,
-                    params: {
-                      title: item.title,
-                      eventName: eventNameValue,
-                      eventDate: eventDateValue,
-                      eventId: eventIdValue,
-                      checklistId: item.id,
-                      docKey: item.docKey,
-                      filePath: filePath || undefined,
-                      fileUrl: buildFileUrl(fileUrlFromApi || filePath) || undefined,
-                      source: sourceFrom,
-                      location: currentEvent?.location || params.location,
-                      pic: currentEvent?.user?.name || params.pic,
-                    }
-                  });
-                }}
-              >
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <Text style={styles.checklistTitle}>{item.title}</Text>
-                  {statusCode === 'R' && revisionComment && (
-                    <Text style={styles.revisionCommentText}>
-                      Catatan: {revisionComment}
-                    </Text>
-                  )}
-                </View>
-                <View style={[styles.statusCircle, { backgroundColor: getStatusColor(statusCode) }]} />
-              </TouchableOpacity>
-            );
-          })
-        )}
-
-        {filteredChecklist.length > 0 && (
-          <View style={styles.legendContainer}>
-            <Text style={styles.legendHeader}>Keterangan:</Text>
-            <View style={styles.legendRow}>
-              <View style={styles.legendItem}><View style={[styles.miniDot, { backgroundColor: '#FF383C' }]} /><Text style={styles.legendText}>Belum ada file</Text></View>
-              <View style={styles.legendItem}><View style={[styles.miniDot, { backgroundColor: '#EA9B03' }]} /><Text style={styles.legendText}>Revisi</Text></View>
-              <View style={styles.legendItem}><View style={[styles.miniDot, { backgroundColor: '#606C38' }]} /><Text style={styles.legendText}>Selesai</Text></View>
+        }
+        ListFooterComponent={
+          filteredChecklist.length > 0 ? (
+            <View style={styles.legendContainer}>
+              <Text style={styles.legendHeader}>Keterangan:</Text>
+              <View style={styles.legendRow}>
+                <View style={styles.legendItem}><View style={[styles.miniDot, { backgroundColor: '#FF383C' }]} /><Text style={styles.legendText}>Belum ada file</Text></View>
+                <View style={styles.legendItem}><View style={[styles.miniDot, { backgroundColor: '#EA9B03' }]} /><Text style={styles.legendText}>Revisi</Text></View>
+                <View style={styles.legendItem}><View style={[styles.miniDot, { backgroundColor: '#606C38' }]} /><Text style={styles.legendText}>Selesai</Text></View>
+              </View>
             </View>
-          </View>
-        )}
-      </ScrollView>
+          ) : null
+        }
+      />
     </SafeAreaView>
   );
 }

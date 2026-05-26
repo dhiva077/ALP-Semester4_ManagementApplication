@@ -91,10 +91,17 @@ export default function EditEvent() {
     return a.minute < b.minute;
   };
 
-  const getEventDate = (event: any) => {
-    const start = event?.start_time || '';
-    return start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+  const formatDateLocal = (value?: string) => {
+    if (!value) return '';
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    if (Number.isNaN(parsed.getTime())) {
+      return value.split('T')[0]?.split(' ')[0] ?? '';
+    }
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
   };
+
+  const getEventDate = (event: any) => formatDateLocal(event?.start_time);
 
   const getEventTime = (value?: string) => {
     if (!value) return '00:00';

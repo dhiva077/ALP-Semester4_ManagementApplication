@@ -49,13 +49,22 @@ export default function InputFile() {
 
   const normalizeName = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
+  const formatDateLocal = (value?: string) => {
+    if (!value) return '';
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(isoLike);
+    if (Number.isNaN(parsed.getTime())) {
+      return value.split('T')[0]?.split(' ')[0] ?? '';
+    }
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  };
+
   const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string, onClose?: () => void) => {
     setAlertConfig({ visible: true, type, title, message, onClose });
   };
 
   const mapEvent = (event: any) => {
-    const start = event?.start_time || '';
-    const dateOnly = start.includes('T') ? start.split('T')[0] : start.split(' ')[0];
+    const dateOnly = formatDateLocal(event?.start_time);
     return {
       id: event.id,
       name: event.name,
@@ -221,7 +230,7 @@ export default function InputFile() {
         };
 
         const toSnake = (value: string) => value.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
-        const filesData = await fetchFiles();
+        const filesData = await fetchFiles({ force: true });
         const record = filesData.find((item: any) => String(item.event_id) === String(selectedEvent.id));
         if (record) {
           const target = docMap.find((doc) => doc.key === expectedDocKey);
