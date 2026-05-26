@@ -313,11 +313,27 @@ class FileController extends Controller
             ], 400);
         }
 
+        $defaultStatusId = Status::where('code', 'B')->value('id');
+        $statusColumn = 'status_' . $type . '_id';
+
+        $file = File::where('event_id', $eventId)->first();
+        if ($file) {
+            $currentStatusId = $file->{$statusColumn} ?? null;
+            $hasExistingFile = !empty($file->{$type});
+            $isFilled = $currentStatusId !== null
+                && (string) $currentStatusId !== (string) $defaultStatusId;
+
+            if ($hasExistingFile && $isFilled) {
+                return response()->json([
+                    'message' => 'Dokumen sudah ada. Hapus atau ubah dokumen lama terlebih dahulu.',
+                    'doc_key' => $type,
+                ], 409);
+            }
+        }
+
         $filename = $eventId . '_' . $type . '.pdf';
 
         $path = Storage::disk('public')->putFileAs('files', $pdfFile, $filename);
-
-        $defaultStatusId = Status::where('code', 'B')->value('id');
 
         $file = File::firstOrCreate(
             ['event_id' => $eventId],

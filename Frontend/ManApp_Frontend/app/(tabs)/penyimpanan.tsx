@@ -8,7 +8,7 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -22,6 +22,7 @@ const YEARS = Array.from({ length: 21 }, (_, i) => 2020 + i);
 
 export default function Penyimpanan() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -192,7 +193,13 @@ export default function Penyimpanan() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(120, insets.bottom + 100) },
+        ]}
+      >
         {filteredEvents.length > 0 ? (
           filteredEvents.map((item) => (
             <TouchableOpacity 
