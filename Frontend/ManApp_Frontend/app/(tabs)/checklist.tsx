@@ -52,7 +52,7 @@ export default function Checklist() {
     try {
       const [events, files] = await Promise.all([
         fetchEvents(),
-        fetchFiles({ force: true }),
+        fetchFiles(),
       ]);
 
       let matched = null;
@@ -77,6 +77,36 @@ export default function Checklist() {
       }
 
       setFileRecord(relatedFile || null);
+
+      Promise.all([
+        fetchEvents({ force: true }),
+        fetchFiles({ force: true }),
+      ]).then(([freshEvents, freshFiles]) => {
+        let freshMatch = null;
+        if (eventId) {
+          freshMatch = freshEvents.find((e: any) => String(e.id) === String(eventId));
+        } else {
+          if (eventName) {
+            freshMatch = freshEvents.find((e: any) => e.name === eventName);
+          }
+
+          if (!freshMatch && eventDate) {
+            freshMatch = freshEvents.find((e: any) => getEventDate(e) === eventDate);
+          }
+        }
+
+        setCurrentEvent(freshMatch || null);
+
+        const freshEventIdValue = freshMatch?.id || eventId;
+        let freshRelatedFile = null;
+        if (freshEventIdValue) {
+          freshRelatedFile = freshFiles.find((file: any) => String(file.event_id) === String(freshEventIdValue));
+        }
+
+        setFileRecord(freshRelatedFile || null);
+      }).catch(() => {
+        // Ignore refresh errors to keep cached status visible
+      });
     } catch (error) {
       console.error('Load checklist error:', error);
     }
