@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
-import * as Linking from 'expo-linking';
+import Pdf from 'react-native-pdf';
 import { buildFileUrl, fetchFiles, updateFileStatus, uploadEventPdf } from '../../src/services/fileApi';
 
 export default function FileDetail() {
@@ -28,6 +28,8 @@ export default function FileDetail() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [revisionComment, setRevisionComment] = useState('');
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const previewUrl = currentFileUri || null;
 
   useEffect(() => {
     const loadCurrentUser = async () => {
@@ -133,11 +135,12 @@ export default function FileDetail() {
   };
 
   const handleViewFile = async () => {
-    if (currentFileUri) {
-      const canOpen = await Linking.canOpenURL(currentFileUri);
-      if (canOpen) await Linking.openURL(currentFileUri);
-      else Alert.alert("Info", "Tidak ada aplikasi untuk membuka file ini.");
-    } else Alert.alert("Gagal", "File tidak ditemukan.");
+    if (!previewUrl) {
+      Alert.alert('Gagal', 'File tidak ditemukan.');
+      return;
+    }
+
+    setShowPdfModal(true);
   };
 
   const handleSelesai = () => {
@@ -200,7 +203,22 @@ export default function FileDetail() {
         <View style={styles.previewCard}>
           <View style={styles.cardHeader}><Text style={styles.cardHeaderText}>{title}</Text></View>
           <View style={styles.documentPlaceholder}>
-            <Ionicons name="document-text" size={80} color="rgba(255,255,255,0.2)" />
+            {previewUrl ? (
+              <View pointerEvents="none" style={styles.pdfPreviewWrapper}>
+                <Pdf
+                  source={{ uri: previewUrl, cache: true }}
+                  style={styles.pdfPreview}
+                  trustAllCerts={false}
+                  page={1}
+                  enablePaging={false}
+                  minScale={1}
+                  maxScale={1}
+                  onError={(error) => console.error('PDF preview error:', error)}
+                />
+              </View>
+            ) : (
+              <Ionicons name="document-text" size={80} color="rgba(255,255,255,0.2)" />
+            )}
           </View>
           <View style={styles.cardActions}>
             <TouchableOpacity style={styles.actionItem} onPress={handlePickFile}>
@@ -230,6 +248,41 @@ export default function FileDetail() {
           </View>
         )}
       </View>
+
+      <Modal
+        visible={showPdfModal}
+        animationType="slide"
+        onRequestClose={() => setShowPdfModal(false)}
+      >
+        <SafeAreaView style={styles.pdfModalContainer}>
+          <View style={styles.pdfModalHeader}>
+            <TouchableOpacity onPress={() => setShowPdfModal(false)} style={styles.pdfCloseButton}>
+              <Ionicons name="close" size={24} color="#5C2C00" />
+            </TouchableOpacity>
+            <Text style={styles.pdfModalTitle} numberOfLines={1}>{title || 'Dokumen'}</Text>
+          </View>
+          {previewUrl ? (
+            <Pdf
+              source={{ uri: previewUrl, cache: true }}
+              style={styles.pdfModalViewer}
+              trustAllCerts={false}
+              enablePaging
+              fitPolicy={0}
+              scale={1}
+              minScale={1}
+              maxScale={4}
+              spacing={0}
+              enableAntialiasing
+              enableAnnotationRendering
+              onError={(error) => console.error('PDF modal error:', error)}
+            />
+          ) : (
+            <View style={styles.pdfModalEmpty}>
+              <Text style={styles.pdfModalEmptyText}>File tidak ditemukan.</Text>
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
 
       <Modal
         visible={showRevisionModal}
@@ -334,6 +387,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#4E2A00',
+  },
+
+  pdfPreview: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#4E2A00',
+  },
+
+  pdfPreviewWrapper: {
+    width: '100%',
+    height: '100%',
+  },
+
+  pdfModalContainer: {
+    flex: 1,
+    backgroundColor: '#FFFDF0',
+  },
+
+  pdfModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E6D3B0',
+    gap: 12,
+  },
+
+  pdfCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFE2B8',
+  },
+
+  pdfModalTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#5C2C00',
+  },
+
+  pdfModalViewer: {
+    flex: 1,
+    backgroundColor: '#FFFDF0',
+  },
+
+  pdfModalEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  pdfModalEmptyText: {
+    color: '#5C2C00',
+    fontSize: 14,
   },
 
 
