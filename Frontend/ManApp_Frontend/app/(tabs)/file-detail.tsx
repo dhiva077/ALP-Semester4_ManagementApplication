@@ -211,8 +211,11 @@ export default function FileDetail() {
                   trustAllCerts={false}
                   page={1}
                   enablePaging={false}
-                  minScale={1}
-                  maxScale={1}
+                  fitPolicy={2}
+                  scale={1.2}
+                  minScale={1.2}
+                  maxScale={1.2}
+                  spacing={0}
                   onError={(error) => console.error('PDF preview error:', error)}
                 />
               </View>
@@ -453,6 +456,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: 15,
     backgroundColor: '#FFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E6D3B0',
   },
 
   actionItem: {
