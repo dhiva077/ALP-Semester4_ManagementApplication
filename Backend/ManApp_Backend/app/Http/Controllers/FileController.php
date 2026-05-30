@@ -181,6 +181,9 @@ class FileController extends Controller
 
         $documentMappings = [
             'form_checklist_sebelum_acara' => [
+                'form checklist pemakaian lapangan',
+                'checklist persiapan sebelum',
+                'kondisi sebelum acara',
                 'form_checklist_sebelum_acara',
                 'checklist sebelum',
                 'Checklist Sebelum Acara',
@@ -195,6 +198,8 @@ class FileController extends Controller
                 'persiapan'
             ],
             'surat_perjanjian_kerjasama'   => [
+                'perjanjian kerja sama penggunaan fasilitas',
+                'perjanjian kerja sama',
                 'surat_perjanjian_kerjasama',
                 'perjanjian kerjasama',
                 'Perjanjian Kerjasama',
@@ -213,6 +218,7 @@ class FileController extends Controller
             'invoice'                      => [
                 'invoice',
                 'Invoice',
+                'biaya sewa lapangan',
                 'faktur',
                 'tagihan',
                 'receipt',
@@ -226,6 +232,8 @@ class FileController extends Controller
                 'struk'
             ],
             'lembar_disposisi'             => [
+                'pengambilan deposit',
+                'nominal deposit',
                 'lembar_disposisi',
                 'lembar disposisi',
                 'Lembar Disposisi',
@@ -241,6 +249,8 @@ class FileController extends Controller
                 'memo'
             ],
             'surat_izin_loading'           => [
+                'surat izin loading',
+                'izin untuk melakukan loading',
                 'surat_izin_loading',
                 'Surat Izin Loading',
                 'izin loading',
@@ -257,6 +267,8 @@ class FileController extends Controller
                 'izin bongkar'
             ],
             'form_checklist_setelah_acara' => [
+                'serah terima sesudah',
+                'kondisi sesudah acara',
                 'form_checklist_setelah_acara',
                 'checklist setelah',
                 'Checklist Setelah Acara',
@@ -353,7 +365,7 @@ class FileController extends Controller
 
         if (isset($file->$statusColumn) || in_array($statusColumn, array_keys($file->getAttributes()))) {
             $file->$statusColumn = Status::where('code', 'S')->value('id');
-            
+
             // Clear revision comment on re-upload
             $commentColumn = 'revisi_' . $type;
             if (in_array($commentColumn, array_keys($file->getAttributes()))) {
@@ -407,7 +419,7 @@ class FileController extends Controller
         $statusId = Status::where('code', $statusCode)->value('id');
 
         $file->$statusColumn = $statusId;
-        
+
         // Handle revision comment
         $commentColumn = 'revisi_' . $docKey;
         if ($statusCode === 'R') {
