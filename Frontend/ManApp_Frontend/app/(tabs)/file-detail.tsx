@@ -13,8 +13,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
-import Pdf from 'react-native-pdf';
+import * as WebBrowser from 'expo-web-browser';
 import { buildFileUrl, fetchFiles, updateFileStatus, uploadEventPdf } from '../../src/services/fileApi';
+
+const PdfComponent = (() => {
+  try {
+    // Avoid crashing in Expo Go when native module is unavailable.
+    return require('react-native-pdf').default as React.ComponentType<any>;
+  } catch (error) {
+    return null;
+  }
+})();
 
 export default function FileDetail() {
   const router = useRouter();
@@ -140,6 +149,11 @@ export default function FileDetail() {
       return;
     }
 
+    if (!PdfComponent) {
+      await WebBrowser.openBrowserAsync(previewUrl);
+      return;
+    }
+
     setShowPdfModal(true);
   };
 
@@ -203,9 +217,9 @@ export default function FileDetail() {
         <View style={styles.previewCard}>
           <View style={styles.cardHeader}><Text style={styles.cardHeaderText}>{title}</Text></View>
           <View style={styles.documentPlaceholder}>
-            {previewUrl ? (
+            {previewUrl && PdfComponent ? (
               <View pointerEvents="none" style={styles.pdfPreviewWrapper}>
-                <Pdf
+                <PdfComponent
                   source={{ uri: previewUrl, cache: true }}
                   style={styles.pdfPreview}
                   trustAllCerts={false}
@@ -216,7 +230,7 @@ export default function FileDetail() {
                   minScale={1.2}
                   maxScale={1.2}
                   spacing={0}
-                  onError={(error) => console.error('PDF preview error:', error)}
+                  onError={(error: unknown) => console.error('PDF preview error:', error)}
                 />
               </View>
             ) : (
@@ -264,8 +278,8 @@ export default function FileDetail() {
             </TouchableOpacity>
             <Text style={styles.pdfModalTitle} numberOfLines={1}>{title || 'Dokumen'}</Text>
           </View>
-          {previewUrl ? (
-            <Pdf
+          {previewUrl && PdfComponent ? (
+            <PdfComponent
               source={{ uri: previewUrl, cache: true }}
               style={styles.pdfModalViewer}
               trustAllCerts={false}
@@ -277,11 +291,13 @@ export default function FileDetail() {
               spacing={0}
               enableAntialiasing
               enableAnnotationRendering
-              onError={(error) => console.error('PDF modal error:', error)}
+              onError={(error: unknown) => console.error('PDF modal error:', error)}
             />
           ) : (
             <View style={styles.pdfModalEmpty}>
-              <Text style={styles.pdfModalEmptyText}>File tidak ditemukan.</Text>
+              <Text style={styles.pdfModalEmptyText}>
+                {previewUrl ? 'Preview PDF tidak tersedia di Expo Go.' : 'File tidak ditemukan.'}
+              </Text>
             </View>
           )}
         </SafeAreaView>
