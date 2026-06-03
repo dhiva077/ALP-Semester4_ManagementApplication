@@ -207,7 +207,7 @@ export default function Penyimpanan() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: Math.max(120, insets.bottom + 100) },
+          { paddingBottom: Math.max(180, insets.bottom + 160) },
         ]}
         initialNumToRender={6}
         windowSize={7}
@@ -294,6 +294,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FEF2DB',
+    paddingBottom: 10,
   },
 
   fixedSection: {
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 25,
     paddingTop: 15,
-    paddingBottom: 30,
+    paddingBottom: 60,
   },
 
   eventCard: {

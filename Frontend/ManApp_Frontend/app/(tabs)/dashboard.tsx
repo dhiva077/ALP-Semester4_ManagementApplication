@@ -427,11 +427,12 @@ const mainStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FEF2DB',
+    paddingBottom: 10,
   },
 
   listContent: {
     paddingHorizontal: 0,
-    paddingBottom: 170,
+    paddingBottom: 220,
   },
 
   divider: {
