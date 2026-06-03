@@ -636,6 +636,13 @@ const styles = StyleSheet.create({
     height: 50,
     marginBottom: 12,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
 
   inputContainerMultiline: {
@@ -647,6 +654,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     elevation: 2,
     paddingTop: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
 
   icon: {
@@ -704,6 +718,13 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#FF8C00',
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
 
   fileItemName: {
