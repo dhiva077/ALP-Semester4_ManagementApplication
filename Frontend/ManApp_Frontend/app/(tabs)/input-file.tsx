@@ -497,7 +497,14 @@ const styles = StyleSheet.create({
     borderColor: '#EEE',
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
 
   miniSelectorText: {
@@ -516,7 +523,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#EEE',
+    elevation: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
   },
 
   selectorActive: {
@@ -542,7 +557,14 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 12,
     borderTopWidth: 1,
     borderTopColor: '#EEE',
-    elevation: 5,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
 
   dropdownScroll: {
