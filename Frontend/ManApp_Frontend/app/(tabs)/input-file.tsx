@@ -257,7 +257,7 @@ export default function InputFile() {
 
       for (const file of selectedFiles) {
         try {
-          await uploadEventPdf(selectedEvent.id, file.uri, file.name);
+          await uploadEventPdf(selectedEvent.id, file.uri, file.name, expectedDocKey || undefined);
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Gagal upload berkas.';
           showAlert('error', 'Gagal', `${file.name}: ${msg}`);
