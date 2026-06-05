@@ -8,7 +8,8 @@ import {
   ScrollView,
   Alert,
   Modal,
-  Platform
+  Platform,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -49,6 +50,7 @@ export default function TambahEvent() {
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   
   // Modal States
   const [showDateModal, setShowDateModal] = useState(false);
@@ -90,6 +92,7 @@ export default function TambahEvent() {
     useCallback(() => {
       const loadUser = async () => {
         try {
+          setIsLoadingUser(true);
           const savedUser = await AsyncStorage.getItem('user');
           if (savedUser) {
             const parsed = JSON.parse(savedUser);
@@ -98,6 +101,8 @@ export default function TambahEvent() {
           }
         } catch (error) {
           console.error('Failed to load user:', error);
+        } finally {
+          setIsLoadingUser(false);
         }
       };
 
@@ -247,6 +252,12 @@ export default function TambahEvent() {
         <Text style={styles.headerTitle}>Tambah Event</Text>
       </View>
 
+      {isLoadingUser ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF9800" />
+          <Text style={styles.loadingText}>Memuat data pengguna...</Text>
+        </View>
+      ) : (
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -353,6 +364,7 @@ export default function TambahEvent() {
           <Text style={styles.btnText}>Simpan Event</Text>
         </TouchableOpacity>
       </ScrollView>
+      )}
 
       {/* --- MODALS AREA --- */}
       <Modal visible={showDateModal} transparent animationType="fade" onRequestClose={() => setShowDateModal(false)}>
@@ -585,6 +597,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FEF2DB',
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#5C2C00',
+    fontWeight: '600',
   },
 
   header: {

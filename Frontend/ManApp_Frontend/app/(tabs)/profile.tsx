@@ -14,6 +14,7 @@ import {
   FlatList,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -45,6 +46,7 @@ export default function Profile() {
   const [expandedHistory, setExpandedHistory] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<{ id?: number; name?: string; email?: string; role?: string } | null>(null);
   const [historyEvents, setHistoryEvents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const PROFILE_IMAGE_KEY = 'USER_PROFILE_IMAGE'; 
   const DEFAULT_AVATAR = AVATAR_PRESETS[0].uri;
@@ -52,6 +54,7 @@ export default function Profile() {
   useEffect(() => {
     const loadCurrentUserAndAvatar = async () => {
       try {
+        setIsLoading(true);
         const savedUser = await AsyncStorage.getItem('user');
         const savedAvatar = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
         
@@ -84,6 +87,8 @@ export default function Profile() {
         }
       } catch (error) {
         console.error('Failed load profile data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -191,6 +196,12 @@ export default function Profile() {
         <View style={{ width: 40 }} /> 
       </View>
 
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF8F29" />
+          <Text style={styles.loadingText}>Memuat profil...</Text>
+        </View>
+      ) : (
       <ScrollView 
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContainer}
@@ -278,6 +289,7 @@ export default function Profile() {
         </TouchableOpacity>
 
       </ScrollView>
+      )}
 
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={styles.modalOverlay}>
@@ -503,6 +515,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#606C38',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#5C2C00',
+    fontWeight: '600',
+  },
+
   logoutFullButton: {
     backgroundColor: '#FF383C',
     flexDirection: 'row',

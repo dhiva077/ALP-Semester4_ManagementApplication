@@ -7,6 +7,7 @@ import {
   TextInput,
   ScrollView,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,6 +33,7 @@ export default function Checklist() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentEvent, setCurrentEvent] = useState<any>(null);
   const [fileRecord, setFileRecord] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const currentEventName = typeof eventName === 'string' ? eventName : "Detail Event";
   const currentEventDate = typeof eventDate === 'string' ? eventDate : "";
@@ -49,6 +51,7 @@ export default function Checklist() {
   const getEventDate = (event: any) => formatDateLocal(event?.start_time);
 
   const loadData = async () => {
+    setIsLoading(true);
     try {
       const [events, files] = await Promise.all([
         fetchEvents(),
@@ -109,6 +112,8 @@ export default function Checklist() {
       });
     } catch (error) {
       console.error('Load checklist error:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -194,6 +199,12 @@ export default function Checklist() {
         </View>
       </View>
 
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF8F29" />
+          <Text style={styles.loadingText}>Memuat data...</Text>
+        </View>
+      ) : (
       <FlatList
         data={filteredChecklist}
         keyExtractor={(item) => String(item.id)}
@@ -268,6 +279,7 @@ export default function Checklist() {
           ) : null
         }
       />
+      )}
     </SafeAreaView>
   );
 }
@@ -441,6 +453,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#5C2C00',
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#5C2C00',
+    fontWeight: '600',
   },
 
   emptyContainer: {

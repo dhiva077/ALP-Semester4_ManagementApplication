@@ -7,6 +7,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,6 +39,7 @@ export default function FileDetail() {
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [revisionComment, setRevisionComment] = useState('');
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [isLoadingFile, setIsLoadingFile] = useState(true);
   const previewUrl = currentFileUri || null;
 
   useEffect(() => {
@@ -58,8 +60,12 @@ export default function FileDetail() {
 
   useEffect(() => {
     const loadLatestFile = async () => {
-      if (!eventId || !docKey) return;
+      if (!eventId || !docKey) {
+        setIsLoadingFile(false);
+        return;
+      }
       try {
+        setIsLoadingFile(true);
         const files = await fetchFiles();
         const record = files.find((item: any) => String(item.event_id) === String(eventId));
         if (!record) return;
@@ -70,6 +76,8 @@ export default function FileDetail() {
         if (resolved) setCurrentFileUri(resolved);
       } catch (error) {
         console.error('Failed to refresh file detail:', error);
+      } finally {
+        setIsLoadingFile(false);
       }
     };
 
@@ -214,6 +222,12 @@ export default function FileDetail() {
       </View>
 
       <View style={styles.content}>
+        {isLoadingFile ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FF8F29" />
+            <Text style={styles.loadingText}>Memuat file...</Text>
+          </View>
+        ) : (
         <View style={styles.previewCard}>
           <View style={styles.cardHeader}><Text style={styles.cardHeaderText}>{title}</Text></View>
           <View style={styles.documentPlaceholder}>
@@ -249,6 +263,7 @@ export default function FileDetail() {
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
         {isManager && (
           <View style={styles.decisionRow}>
@@ -484,6 +499,20 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 11,
     fontWeight: 'bold',
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#5C2C00',
+    fontWeight: '600',
   },
 
   decisionRow: {

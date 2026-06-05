@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -55,6 +56,7 @@ export default function Dashboard() {
   const [events, setEvents] = useState<EventData>({});
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string; role?: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
   const [tempMonth, setTempMonth] = useState(currentDate.getMonth());
   const [tempYear, setTempYear] = useState(currentDate.getFullYear());
@@ -130,8 +132,11 @@ export default function Dashboard() {
   // --- REFRESH DATA SAAT HALAMAN DIFOKUSKAN ---
   useFocusEffect(
     useCallback(() => {
-      loadProfileData();
-      loadEvents();
+      setIsLoading(true);
+      Promise.all([
+        loadProfileData(),
+        loadEvents(),
+      ]).finally(() => setIsLoading(false));
     }, []) 
   );
 
@@ -283,6 +288,13 @@ export default function Dashboard() {
         </View>
       </Modal>
 
+      {isLoading ? (
+        <View style={mainStyles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF8F29" />
+          <Text style={mainStyles.loadingText}>Memuat data...</Text>
+        </View>
+      ) : (
+      <>
       {/* LEGEND */}
       <View style={legendStyles.pill}>
         <Text style={legendStyles.title}>Keterangan:</Text>
@@ -321,6 +333,8 @@ export default function Dashboard() {
           </TouchableOpacity>
         )) : <Text style={mainStyles.emptyText}>Tidak ada event.</Text>}
       </ScrollView>
+      </>
+      )}
 
       {/* FAB */}
       <TouchableOpacity style={fabStyles.button} onPress={() => router.push('/tambah-event')}>
@@ -447,6 +461,20 @@ const mainStyles = StyleSheet.create({
     textAlign: 'center',
     color: '#5C2C00',
     opacity: 0.6,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#5C2C00',
+    fontWeight: '600',
   },
 });
 
