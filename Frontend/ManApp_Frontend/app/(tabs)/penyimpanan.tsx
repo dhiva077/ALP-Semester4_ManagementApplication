@@ -8,6 +8,7 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -26,6 +27,7 @@ export default function Penyimpanan() {
   const insets = useSafeAreaInsets();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -109,6 +111,7 @@ export default function Penyimpanan() {
   };
 
   const loadData = async () => {
+    setIsLoading(true);
     try {
       const [eventsData, filesData] = await Promise.all([fetchEvents(), fetchFiles()]);
 
@@ -132,6 +135,8 @@ export default function Penyimpanan() {
       setEvents(allEvents);
     } catch (error) {
       console.error(error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -201,6 +206,12 @@ export default function Penyimpanan() {
         </View>
       </View>
 
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF8F29" />
+          <Text style={styles.loadingText}>Memuat data...</Text>
+        </View>
+      ) : (
       <FlatList
         data={filteredEvents}
         keyExtractor={(item) => `${item.date}-${item.id}`}
@@ -251,6 +262,7 @@ export default function Penyimpanan() {
           </View>
         }
       />
+      )}
 
       <Modal visible={showPicker} transparent animationType="fade">
         <View style={pickerStyles.overlay}>
@@ -421,6 +433,19 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     marginLeft: 10,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#5C2C00',
+    fontWeight: '600',
   },
 
   emptyContainer: {

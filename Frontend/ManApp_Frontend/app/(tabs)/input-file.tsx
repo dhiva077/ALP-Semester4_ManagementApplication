@@ -195,7 +195,25 @@ export default function InputFile() {
     }
     
     // Membuka file picker lokal perangkat (Data Event dijamin tetap melekat dan aman)
-    await handlePickFile();
+    const result = await handlePickFile();
+    
+    if (result.oversized.length > 0) {
+      const fileList = result.oversized.map(f => `• ${f}`).join('\n');
+      showAlert(
+        'error',
+        'File Terlalu Besar',
+        `File berikut melebihi batas maksimal 10 MB dan tidak ditambahkan:\n\n${fileList}\n\nSilakan pilih file dengan ukuran lebih kecil.`
+      );
+    }
+
+    if (result.duplicates.length > 0) {
+      const fileList = result.duplicates.map(f => `• ${f}`).join('\n');
+      showAlert(
+        'warning',
+        'File Sudah Ada',
+        `File berikut sudah ada dalam daftar dan dilewati:\n\n${fileList}`
+      );
+    }
   };
 
   const handleFinalUpload = async () => {
@@ -255,18 +273,50 @@ export default function InputFile() {
 
       setIsUploading(true);
 
-      for (const file of selectedFiles) {
+      // Upload file satu per satu:
+      // - Jika sukses, hapus file dari daftar tampilan
+      // - Jika gagal, file tetap di daftar dan lanjut ke file berikutnya
+      const successFiles: string[] = [];
+      const failedFiles: { name: string; reason: string }[] = [];
+
+      // Salin daftar file karena selectedFiles bisa berubah selama proses
+      const filesToUpload = [...selectedFiles];
+
+      for (const file of filesToUpload) {
         try {
           await uploadEventPdf(selectedEvent.id, file.uri, file.name, expectedDocKey || undefined);
+          // Hapus file yang berhasil dari tampilan
+          removeFileByUri(file.uri);
+          successFiles.push(file.name);
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Gagal upload berkas.';
-          showAlert('error', 'Gagal', `${file.name}: ${msg}`);
-          return;
+          failedFiles.push({ name: file.name, reason: msg });
+          // File gagal tetap ada di daftar — user bisa lihat dan coba lagi
         }
       }
 
-      clearAllFiles();
-      showAlert('success', 'Berhasil', 'Berkas berhasil diunggah!', () => handleBackNavigation());
+      // Tampilkan ringkasan hasil upload
+      const total = filesToUpload.length;
+      const successCount = successFiles.length;
+      const failedCount = failedFiles.length;
+
+      if (failedCount === 0) {
+        // Semua berhasil
+        showAlert('success', 'Berhasil', `${successCount} berkas berhasil diunggah!`, () => handleBackNavigation());
+      } else if (successCount === 0) {
+        // Semua gagal
+        const detail = failedFiles.map(f => `• ${f.name}: ${f.reason}`).join('\n');
+        showAlert('error', 'Upload Gagal', `Semua ${total} berkas gagal diunggah:\n\n${detail}`);
+      } else {
+        // Sebagian berhasil, sebagian gagal
+        const successDetail = successFiles.map(f => `• ${f}`).join('\n');
+        const failDetail = failedFiles.map(f => `• ${f.name}: ${f.reason}`).join('\n');
+        showAlert(
+          'warning',
+          'Upload Sebagian',
+          `${successCount} berkas berhasil diunggah (hilang dari daftar):\n${successDetail}\n\n${failedCount} berkas gagal (tetap di daftar untuk dicoba lagi):\n${failDetail}`
+        );
+      }
     } finally {
       setIsUploading(false);
     }
@@ -396,11 +446,35 @@ export default function InputFile() {
         )}
 
         <View style={{ marginTop: 20 }}>
-          <Text style={styles.sectionLabel}>Upload Berkas</Text>
+          <View style={styles.uploadDescriptionCard}>
+            <View style={styles.uploadDescriptionHeader}>
+              <MaterialCommunityIcons name="file-document-multiple-outline" size={28} color="#FF8F29" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.uploadDescriptionTitle}>Upload Berkas</Text>
+                <Text style={styles.uploadDescriptionSubtitle}>Jenis dokumen yang dapat diunggah:</Text>
+              </View>
+            </View>
+            <View style={styles.documentTypeList}>
+              {[
+                'Form Checklist Sebelum & Setelah Acara',
+                'PKS (Perjanjian Kerjasama)',
+                'Invoice',
+                'Lembar Disposisi',
+                'Surat Izin Loading',
+              ].map((doc, i) => (
+                <View key={i} style={styles.documentTypeRow}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.documentTypeText}>{doc}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
           <TouchableOpacity style={[styles.uploadBox, selectedFiles.length > 0 && styles.uploadBoxActive]} onPress={onPickFilePress}>
             <MaterialCommunityIcons name={selectedFiles.length > 0 ? "file-plus" : "cloud-upload"} size={40} color={selectedFiles.length > 0 ? "#2E7D32" : "#FF8F29"} />
             <Text style={styles.uploadText}>{selectedFiles.length > 0 ? "Tambah Berkas" : "Pilih File Dokumen"}</Text>
           </TouchableOpacity>
+
+          <Text style={styles.formatInfo}>Format yang diperbolehkan: PDF (Maks. 10 MB)</Text>
 
           {selectedFiles.map((file, index) => (
             <View key={index} style={styles.fileItemCard}>
@@ -622,9 +696,17 @@ const styles = StyleSheet.create({
     color: '#5C2C00',
   },
 
+  formatInfo: {
+    fontSize: 12,
+    color: '#8D6E63',
+    marginBottom: 4,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+
   uploadBox: {
     height: 140,
-    marginTop: 10,
+    marginTop: 8,
     marginBottom: 5,
     borderRadius: 20,
     backgroundColor: '#FFF',
@@ -645,6 +727,62 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#5C2C00',
+  },
+
+  uploadDescriptionCard: {
+    marginTop: 8,
+    marginBottom: 12,
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF8F29',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+
+  uploadDescriptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
+  uploadDescriptionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#5C2C00',
+  },
+
+  uploadDescriptionSubtitle: {
+    fontSize: 11,
+    color: '#8D6E63',
+    marginTop: 2,
+  },
+
+  documentTypeList: {
+    paddingLeft: 40,
+  },
+
+  documentTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+
+  bulletPoint: {
+    fontSize: 14,
+    color: '#FF8F29',
+    marginRight: 8,
+    fontWeight: 'bold',
+  },
+
+  documentTypeText: {
+    fontSize: 12,
+    color: '#5C2C00',
+    fontWeight: '500',
   },
 
   fileItemCard: {

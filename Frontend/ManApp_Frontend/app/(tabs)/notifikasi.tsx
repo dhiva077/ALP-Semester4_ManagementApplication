@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,8 +26,10 @@ interface NotificationItem {
 export default function Notifikasi() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadNotifications = async () => {
+    setIsLoading(true);
     try {
       const savedUserStr = await AsyncStorage.getItem("user");
       if (!savedUserStr) return;
@@ -83,6 +86,8 @@ export default function Notifikasi() {
       );
     } catch (error) {
       console.error("Gagal memuat notifikasi:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -122,6 +127,12 @@ export default function Notifikasi() {
         </TouchableOpacity>
       </View>
 
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF8C2B" />
+          <Text style={styles.loadingText}>Memuat notifikasi...</Text>
+        </View>
+      ) : (
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -170,6 +181,7 @@ export default function Notifikasi() {
           </View>
         )}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -273,6 +285,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: "#fff",
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#5C2C00',
+    fontWeight: '600',
   },
 
   emptyContainer: {
