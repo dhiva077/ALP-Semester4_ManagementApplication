@@ -171,158 +171,161 @@ class FileController extends Controller
         $pdfFile = $validated['pdf_file'];
         $expectedDocKey = $validated['expected_doc_key'] ?? null;
 
-        // Parse PDF using pure PHP
-        $parser = new Parser();
-        $pdf = $parser->parseFile($pdfFile->getRealPath());
-        $text = $pdf->getText();
-
-        $lowerText = strtolower($text);
-        $normalizedText = trim(preg_replace('/[^a-z0-9]+/i', ' ', $lowerText));
-
-        $documentMappings = [
-            'form_checklist_sebelum_acara' => [
-                'form checklist pemakaian lapangan',
-                'checklist persiapan sebelum',
-                'kondisi sebelum acara',
-                'form_checklist_sebelum_acara',
-                'checklist sebelum',
-                'Checklist Sebelum Acara',
-                'sebelum acara',
-                'form checklist sebelum',
-                'pre-event',
-                'pre event',
-                'persiapan acara',
-                'persiapan event',
-                'daftar periksa sebelum',
-                'checklist preparation',
-                'persiapan'
-            ],
-            'surat_perjanjian_kerjasama'   => [
-                'perjanjian kerja sama penggunaan fasilitas',
-                'perjanjian kerja sama',
-                'surat_perjanjian_kerjasama',
-                'perjanjian kerjasama',
-                'Perjanjian Kerjasama',
-                'surat perjanjian',
-                'spk',
-                'mou',
-                'memorandum of understanding',
-                'kontrak',
-                'contract',
-                'agreement',
-                'kesepakatan',
-                'kerja sama',
-                'surat kontrak',
-                'surat kesepakatan'
-            ],
-            'invoice'                      => [
-                'invoice',
-                'Invoice',
-                'biaya sewa lapangan',
-                'faktur',
-                'tagihan',
-                'receipt',
-                'nota',
-                'pembayaran',
-                'payment',
-                'bill',
-                'bukti bayar',
-                'kwitansi',
-                'kuitansi',
-                'struk'
-            ],
-            'lembar_disposisi'             => [
-                'pengambilan deposit',
-                'nominal deposit',
-                'lembar_disposisi',
-                'lembar disposisi',
-                'Lembar Disposisi',
-                'disposisi',
-                'surat tugas',
-                'penugasan',
-                'assignment',
-                'mandat',
-                'lembar pengantar',
-                'instruksi kerja',
-                'surat pengantar',
-                'nota dinas',
-                'memo'
-            ],
-            'surat_izin_loading'           => [
-                'surat izin loading',
-                'izin untuk melakukan loading',
-                'surat_izin_loading',
-                'Surat Izin Loading',
-                'izin loading',
-                'surat izin',
-                'loading',
-                'surat izin loading',
-                'loading permit',
-                'izin masuk',
-                'izin bongkar muat',
-                'surat jalan',
-                'izin kerja',
-                'work permit',
-                'clearance',
-                'izin bongkar'
-            ],
-            'form_checklist_setelah_acara' => [
-                'serah terima sesudah',
-                'kondisi sesudah acara',
-                'form_checklist_setelah_acara',
-                'checklist setelah',
-                'Checklist Setelah Acara',
-                'setelah acara',
-                'form checklist setelah',
-                'post-event',
-                'post event',
-                'evaluasi acara',
-                'penutupan acara',
-                'daftar periksa setelah',
-                'berita acara penyelesaian',
-                'bap',
-                'handover'
-            ],
-        ];
-
+        // Determine document type
         $type = null;
-        $sentences = preg_split('/[.!?\r\n]+/', $text) ?: [];
+        $text = '';
 
-        foreach ($sentences as $sentence) {
-            $normalizedSentence = trim(preg_replace('/[^a-z0-9]+/i', ' ', strtolower($sentence)));
-            if ($normalizedSentence === '') {
-                continue;
-            }
+        if ($expectedDocKey) {
+            // If expected doc key is provided (from checklist/file-detail), trust it directly
+            // This avoids auto-detection issues with scanned PDFs or ambiguous content
+            $type = $expectedDocKey;
+        } else {
+            // Auto-detect document type from PDF content
+            $parser = new Parser();
+            $pdf = $parser->parseFile($pdfFile->getRealPath());
+            $text = $pdf->getText();
 
-            foreach ($documentMappings as $column => $keywords) {
-                foreach ($keywords as $keyword) {
-                    $normalizedKeyword = strtolower(str_replace(['_', '-'], ' ', $keyword));
-                    $pattern = '/\b' . preg_quote($normalizedKeyword, '/') . '\b/i';
-                    if (preg_match($pattern, $normalizedSentence)) {
-                        $type = $column;
-                        break 3;
+            $lowerText = strtolower($text);
+            $normalizedText = trim(preg_replace('/[^a-z0-9]+/i', ' ', $lowerText));
+
+            $documentMappings = [
+                'form_checklist_sebelum_acara' => [
+                    'form checklist pemakaian lapangan',
+                    'checklist persiapan sebelum',
+                    'kondisi sebelum acara',
+                    'form_checklist_sebelum_acara',
+                    'checklist sebelum',
+                    'Checklist Sebelum Acara',
+                    'sebelum acara',
+                    'form checklist sebelum',
+                    'pre-event',
+                    'pre event',
+                    'persiapan acara',
+                    'persiapan event',
+                    'daftar periksa sebelum',
+                    'checklist preparation',
+                    'persiapan'
+                ],
+                'surat_perjanjian_kerjasama'   => [
+                    'perjanjian kerja sama penggunaan fasilitas',
+                    'perjanjian kerja sama',
+                    'surat_perjanjian_kerjasama',
+                    'perjanjian kerjasama',
+                    'Perjanjian Kerjasama',
+                    'surat perjanjian',
+                    'spk',
+                    'mou',
+                    'memorandum of understanding',
+                    'kontrak',
+                    'contract',
+                    'agreement',
+                    'kesepakatan',
+                    'kerja sama',
+                    'surat kontrak',
+                    'surat kesepakatan'
+                ],
+                'invoice'                      => [
+                    'invoice',
+                    'Invoice',
+                    'biaya sewa lapangan',
+                    'faktur',
+                    'tagihan',
+                    'receipt',
+                    'nota',
+                    'pembayaran',
+                    'payment',
+                    'bill',
+                    'bukti bayar',
+                    'kwitansi',
+                    'kuitansi',
+                    'struk'
+                ],
+                'lembar_disposisi'             => [
+                    'pengambilan deposit',
+                    'nominal deposit',
+                    'lembar_disposisi',
+                    'lembar disposisi',
+                    'Lembar Disposisi',
+                    'disposisi',
+                    'surat tugas',
+                    'penugasan',
+                    'assignment',
+                    'mandat',
+                    'lembar pengantar',
+                    'instruksi kerja',
+                    'surat pengantar',
+                    'nota dinas',
+                    'memo'
+                ],
+                'surat_izin_loading'           => [
+                    'surat izin loading',
+                    'izin untuk melakukan loading',
+                    'surat_izin_loading',
+                    'Surat Izin Loading',
+                    'izin loading',
+                    'surat izin',
+                    'loading',
+                    'surat izin loading',
+                    'loading permit',
+                    'izin masuk',
+                    'izin bongkar muat',
+                    'surat jalan',
+                    'izin kerja',
+                    'work permit',
+                    'clearance',
+                    'izin bongkar'
+                ],
+                'form_checklist_setelah_acara' => [
+                    'serah terima sesudah',
+                    'kondisi sesudah acara',
+                    'form_checklist_setelah_acara',
+                    'checklist setelah',
+                    'Checklist Setelah Acara',
+                    'setelah acara',
+                    'form checklist setelah',
+                    'post-event',
+                    'post event',
+                    'evaluasi acara',
+                    'penutupan acara',
+                    'daftar periksa setelah',
+                    'berita acara penyelesaian',
+                    'bap',
+                    'handover'
+                ],
+            ];
+
+            $type = null;
+            $sentences = preg_split('/[.!?\r\n]+/', $text) ?: [];
+
+            foreach ($sentences as $sentence) {
+                $normalizedSentence = trim(preg_replace('/[^a-z0-9]+/i', ' ', strtolower($sentence)));
+                if ($normalizedSentence === '') {
+                    continue;
+                }
+
+                foreach ($documentMappings as $column => $keywords) {
+                    foreach ($keywords as $keyword) {
+                        $normalizedKeyword = strtolower(str_replace(['_', '-'], ' ', $keyword));
+                        $pattern = '/\b' . preg_quote($normalizedKeyword, '/') . '\b/i';
+                        if (preg_match($pattern, $normalizedSentence)) {
+                            $type = $column;
+                            break 3;
+                        }
                     }
                 }
             }
-        }
 
-        if (!$type && strlen($normalizedText) < 3) {
-            return response()->json([
-                'message' => 'PDF tidak terbaca atau teks terlalu sedikit.'
-            ], 400);
-        }
+            if (!$type && strlen($normalizedText) < 3) {
+                return response()->json([
+                    'message' => 'PDF tidak terbaca atau teks terlalu sedikit.'
+                ], 400);
+            }
 
-        if (!$type) {
-            return response()->json([
-                'message' => 'Jenis dokumen tidak dikenali.'
-            ], 400);
-        }
-
-        if ($expectedDocKey && $expectedDocKey !== $type) {
-            return response()->json([
-                'message' => 'Dokumen tidak sesuai dengan jenis yang dipilih.',
-                'detected_type' => $type,
-            ], 400);
+            if (!$type) {
+                return response()->json([
+                    'message' => 'Jenis dokumen tidak dikenali.'
+                ], 400);
+            }
         }
 
         $defaultStatusId = Status::where('code', 'B')->value('id');
@@ -343,7 +346,8 @@ class FileController extends Controller
             }
         }
 
-        $filename = $eventId . '_' . $type . '.pdf';
+        // Gunakan timestamp agar file tidak saling timpa
+        $filename = $eventId . '_' . $type . '_' . time() . '.pdf';
 
         $path = Storage::disk('public')->putFileAs('files', $pdfFile, $filename);
 
