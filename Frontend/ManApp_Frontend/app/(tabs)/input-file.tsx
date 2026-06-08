@@ -7,6 +7,7 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -491,9 +492,16 @@ export default function InputFile() {
           activeOpacity={0.8}
           style={[styles.btnSimpan, (selectedFiles.length === 0 || !selectedEvent || isUploading) && { opacity: 0.5 }]}
           onPress={handleFinalUpload}
-          disabled={isUploading}
+          disabled={selectedFiles.length === 0 || !selectedEvent || isUploading}
         >
-          <Text style={styles.btnText}>Upload & Auto Mapping</Text>
+          {isUploading ? (
+            <View style={styles.btnLoadingRow}>
+              <ActivityIndicator size="small" color="#FFFDF0" />
+              <Text style={styles.btnText}>Sedang Mengupload...</Text>
+            </View>
+          ) : (
+            <Text style={styles.btnText}>Upload & Auto Mapping</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -810,6 +818,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     elevation: 5,
+  },
+
+  btnLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
 
   btnText: {
