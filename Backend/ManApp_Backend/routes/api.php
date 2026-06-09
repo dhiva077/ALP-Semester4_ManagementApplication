@@ -14,6 +14,7 @@ Route::post('/user/push-token', [UserController::class, 'savePushToken']);
 Route::post('login', [UserController::class, 'login']);
 Route::post('files/upload', [FileController::class, 'upload']);
 Route::patch('files/status', [FileController::class, 'updateStatus']);
+Route::post('files/ai-validate', [FileController::class, 'aiValidate']);
 Route::apiResource('users', UserController::class);
 Route::apiResource('events', EventController::class);
 Route::apiResource('files', FileController::class);

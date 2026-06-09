@@ -63,6 +63,11 @@ class File extends Model
         'form_checklist_setelah_acara',
         'status_form_checklist_setelah_acara_id',
         'revisi_form_checklist_setelah_acara',
+        'ai_valid',
+        'ai_detected_type',
+        'ai_confidence',
+        'ai_explanation',
+        'ai_processed',
     ];
 
     /**
@@ -85,6 +90,11 @@ class File extends Model
             'status_surat_izin_loading_id' => 'string',
             'form_checklist_setelah_acara' => 'string',
             'status_form_checklist_setelah_acara_id' => 'string',
+            'ai_valid' => 'boolean',
+            'ai_detected_type' => 'string',
+            'ai_confidence' => 'string',
+            'ai_explanation' => 'string',
+            'ai_processed' => 'boolean',
         ];
     }
 

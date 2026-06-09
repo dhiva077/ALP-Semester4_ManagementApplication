@@ -15,7 +15,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
-import { buildFileUrl, fetchFiles, updateFileStatus, uploadEventPdf } from '../../src/services/fileApi';
+import { buildFileUrl, fetchFiles, updateFileStatus, uploadEventPdf, aiRevalidateFile } from '../../src/services/fileApi';
 
 const PdfComponent = (() => {
   try {
@@ -31,16 +31,37 @@ export default function FileDetail() {
   const params = useLocalSearchParams();
   const { title, eventName, eventDate, source, fileUrl, filePath, docKey, eventId } = params;
 
-  const [currentFileUri, setCurrentFileUri] = useState<string | null>(
-    (fileUrl as string) || buildFileUrl(filePath as string) || null
-  );
+  const [currentFileUri, setCurrentFileUri] = useState<string | null>(null);
   const [isManager, setIsManager] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
-  const [revisionComment, setRevisionComment] = useState('');
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [revisionComment, setRevisionComment] = useState('');
   const [isLoadingFile, setIsLoadingFile] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [aiValidation, setAiValidation] = useState<{
+    ai_valid: boolean | null;
+    ai_detected_type: string | null;
+    ai_confidence: string | null;
+    ai_explanation: string | null;
+    ai_processed: boolean;
+  } | null>(null);
+
+  // Helper to get AI field from record (supports both old and new format)
+  const getAiField = (record: any, field: string) => {
+    // Try direct field first (database column)
+    if (record?.[field] !== undefined && record?.[field] !== null) return record[field];
+    // Try snake_case
+    const snake = field.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+    if (record?.[snake] !== undefined && record?.[snake] !== null) return record[snake];
+    return null;
+  };
   const previewUrl = currentFileUri || null;
+
+  const buildCacheBustedUrl = (url: string) => {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}_t=${Date.now()}`;
+  };
 
   useEffect(() => {
     const loadCurrentUser = async () => {
@@ -66,23 +87,42 @@ export default function FileDetail() {
       }
       try {
         setIsLoadingFile(true);
-        const files = await fetchFiles();
+        // Paksa fetch dari server (bypass cache) untuk dapat data terbaru
+        const files = await fetchFiles({ force: true });
         const record = files.find((item: any) => String(item.event_id) === String(eventId));
         if (!record) return;
 
-        const pathValue = record?.[String(docKey)] || null;
         const urlValue = record?.[`${String(docKey)}_url`] || null;
+        const pathValue = record?.[String(docKey)] || null;
         const resolved = urlValue || buildFileUrl(pathValue);
-        if (resolved) setCurrentFileUri(resolved);
+        if (resolved) {
+          setCurrentFileUri(buildCacheBustedUrl(resolved));
+        }
+
+        // Load AI validation data
+        if (record) {
+          setAiValidation({
+            ai_valid: getAiField(record, 'ai_valid'),
+            ai_detected_type: getAiField(record, 'ai_detected_type'),
+            ai_confidence: getAiField(record, 'ai_confidence'),
+            ai_explanation: getAiField(record, 'ai_explanation'),
+            ai_processed: getAiField(record, 'ai_processed') === true || getAiField(record, 'ai_processed') === 1,
+          });
+        }
       } catch (error) {
         console.error('Failed to refresh file detail:', error);
+        // Jika fetch gagal, tetap gunakan URL dari params (jika ada)
+        if (!currentFileUri) {
+          const fallbackUrl = (fileUrl as string) || buildFileUrl(filePath as string) || null;
+          if (fallbackUrl) setCurrentFileUri(buildCacheBustedUrl(fallbackUrl));
+        }
       } finally {
         setIsLoadingFile(false);
       }
     };
 
     loadLatestFile();
-  }, [eventId, docKey]);
+  }, [eventId, docKey, refreshKey]);
 
   // Fungsi navigasi balik ke page Checklist dengan membawa parameter state data event asal
   const handleBackToChecklist = () => {
@@ -113,8 +153,12 @@ export default function FileDetail() {
           result.assets[0].name,
           String(docKey)
         );
-        const newUrl = buildFileUrl(uploaded?.path) || result.assets[0].uri;
-        setCurrentFileUri(newUrl);
+        // Paksa refresh data dari API setelah upload
+        const uploadedUrl = uploaded?.url || buildFileUrl(uploaded?.path);
+        if (uploadedUrl) {
+          setCurrentFileUri(buildCacheBustedUrl(uploadedUrl));
+        }
+        setRefreshKey((k) => k + 1);
         Alert.alert("Berhasil", "File berhasil diganti.", [
           { text: 'OK', onPress: () => handleBackToChecklist() },
         ]);
@@ -162,6 +206,7 @@ export default function FileDetail() {
       return;
     }
 
+    // Force re-render PDF modal with fresh URL
     setShowPdfModal(true);
   };
 
@@ -234,7 +279,7 @@ export default function FileDetail() {
             {previewUrl && PdfComponent ? (
               <View pointerEvents="none" style={styles.pdfPreviewWrapper}>
                 <PdfComponent
-                  source={{ uri: previewUrl, cache: true }}
+                  source={{ uri: previewUrl, cache: false }}
                   style={styles.pdfPreview}
                   trustAllCerts={false}
                   page={1}
@@ -263,6 +308,74 @@ export default function FileDetail() {
             </TouchableOpacity>
           </View>
         </View>
+        )}
+
+        {/* AI Validation Card */}
+        {aiValidation && aiValidation.ai_processed && (
+          <View style={[
+            styles.aiValidationCard,
+            aiValidation.ai_valid === true && styles.aiValidationSuccess,
+            aiValidation.ai_valid === false && styles.aiValidationError,
+            aiValidation.ai_valid === null && styles.aiValidationNeutral,
+          ]}>
+            <View style={styles.aiValidationHeader}>
+              <Ionicons
+                name={aiValidation.ai_valid === true ? 'checkmark-circle' : aiValidation.ai_valid === false ? 'alert-circle' : 'help-circle'}
+                size={22}
+                color={aiValidation.ai_valid === true ? '#2E7D32' : aiValidation.ai_valid === false ? '#D32F2F' : '#EA9B03'}
+              />
+              <Text style={[
+                styles.aiValidationTitle,
+                { color: aiValidation.ai_valid === true ? '#2E7D32' : aiValidation.ai_valid === false ? '#D32F2F' : '#EA9B03' }
+              ]}>
+                AI Validation {aiValidation.ai_valid === true ? '✓ Sesuai' : aiValidation.ai_valid === false ? '✗ Tidak Sesuai' : '? Belum Divalidasi'}
+              </Text>
+              {aiValidation.ai_confidence && (
+                <View style={[
+                  styles.confidenceBadge,
+                  aiValidation.ai_confidence === 'tinggi' && styles.confidenceHigh,
+                  aiValidation.ai_confidence === 'sedang' && styles.confidenceMedium,
+                  aiValidation.ai_confidence === 'rendah' && styles.confidenceLow,
+                ]}>
+                  <Text style={styles.confidenceBadgeText}>
+                    {aiValidation.ai_confidence === 'tinggi' ? 'Tinggi' : aiValidation.ai_confidence === 'sedang' ? 'Sedang' : 'Rendah'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {aiValidation.ai_detected_type && (
+              <Text style={styles.aiValidationType}>
+                Terdeteksi: {aiValidation.ai_detected_type.replace(/_/g, ' ')}
+              </Text>
+            )}
+            {aiValidation.ai_explanation && (
+              <Text style={styles.aiValidationExplanation}>{aiValidation.ai_explanation}</Text>
+            )}
+            <TouchableOpacity
+              style={styles.aiRevalidateBtn}
+              onPress={async () => {
+                if (!eventId || !docKey) return;
+                try {
+                  const result = await aiRevalidateFile(Number(eventId), String(docKey));
+                  if (result?.ai_validation) {
+                    setAiValidation({
+                      ai_valid: result.ai_validation.is_valid,
+                      ai_detected_type: result.ai_validation.type || result.ai_validation.detected_type,
+                      ai_confidence: result.ai_validation.confidence,
+                      ai_explanation: result.ai_validation.explanation,
+                      ai_processed: result.ai_validation.ai_processed,
+                    });
+                  }
+                  Alert.alert('Berhasil', 'Validasi AI berhasil diperbarui.');
+                } catch (error) {
+                  Alert.alert('Gagal', 'Gagal melakukan validasi ulang AI.');
+                }
+              }}
+            >
+              <Ionicons name="refresh" size={16} color="#FF8F29" />
+              <Text style={styles.aiRevalidateText}>Validasi Ulang dengan AI</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {isManager && (
@@ -295,7 +408,7 @@ export default function FileDetail() {
           </View>
           {previewUrl && PdfComponent ? (
             <PdfComponent
-              source={{ uri: previewUrl, cache: true }}
+              source={{ uri: previewUrl, cache: false }}
               style={styles.pdfModalViewer}
               trustAllCerts={false}
               enablePaging
@@ -481,7 +594,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-
   cardActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -613,5 +725,97 @@ const styles = StyleSheet.create({
   modalBtnTextConfirm: {
     color: '#FFF',
     fontWeight: '600',
+  },
+
+  aiValidationCard: {
+    width: '100%',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 15,
+    borderWidth: 1,
+    elevation: 3,
+  },
+
+  aiValidationSuccess: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#A5D6A7',
+  },
+
+  aiValidationError: {
+    backgroundColor: '#FFEBEE',
+    borderColor: '#EF9A9A',
+  },
+
+  aiValidationNeutral: {
+    backgroundColor: '#FFF8E1',
+    borderColor: '#FFE082',
+  },
+
+  aiValidationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+
+  aiValidationTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+
+  confidenceBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+
+  confidenceHigh: {
+    backgroundColor: '#C8E6C9',
+  },
+
+  confidenceMedium: {
+    backgroundColor: '#FFF9C4',
+  },
+
+  confidenceLow: {
+    backgroundColor: '#FFCDD2',
+  },
+
+  confidenceBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#5C2C00',
+  },
+
+  aiValidationType: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#5C2C00',
+    marginBottom: 4,
+  },
+
+  aiValidationExplanation: {
+    fontSize: 12,
+    color: '#5C2C00',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+
+  aiRevalidateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 143, 41, 0.1)',
+    alignSelf: 'flex-start',
+  },
+
+  aiRevalidateText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FF8F29',
   },
 });

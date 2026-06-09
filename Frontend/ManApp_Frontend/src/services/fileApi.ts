@@ -55,6 +55,23 @@ export const uploadEventPdf = async (
   return payload;
 };
 
+/**
+ * Perform AI re-validation on an existing file.
+ */
+export const aiRevalidateFile = async (eventId: number, docKey: string) => {
+  const payload = await fetchJson<any>(`${API_BASE}/files/ai-validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event_id: eventId,
+      doc_key: docKey,
+    }),
+  });
+
+  filesCache = null;
+  return payload;
+};
+
 export const updateFileStatus = async (
   eventId: number,
   docKey: string,
