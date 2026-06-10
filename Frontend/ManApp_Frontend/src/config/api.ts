@@ -1,28 +1,20 @@
 /**
  * Centralized API Configuration
- *
- * Auto-detects the host machine running Expo dev server so you
- * do not need to update IPs manually. Falls back to localhost
- * when the dev host is unavailable.
+ * * Configured to target the university's Proxmox VM subdomain
+ * so that both Expo Go and production builds hit the online server.
  */
-import Constants from 'expo-constants';
 
-const PORT = '8000';
+const PRODUCTION_URL = 'https://manapp.mad24.dpdns.org';
 
-const getDevHost = () => {
-  const hostUri = Constants.expoConfig?.hostUri || Constants.manifest2?.extra?.expoGo?.debuggerHost;
-  if (!hostUri) return null;
-  return hostUri.split(':')[0];
-};
-
-const DEV_HOST = getDevHost();
-
-export const API_URL = `http://${DEV_HOST || 'localhost'}:${PORT}/api`;
+// Dikunci langsung ke server Proxmox kampus agar saat discan lewat HP,
+// aplikasi langsung mengambil data dari database MySQL server.
+export const API_URL = `${PRODUCTION_URL}/api`;
 
 export const API_CONFIG = {
   BASE_URL: API_URL,
-  PORT,
-  DEV_HOST,
+  PORT: '443', // Jaringan HTTPS secara default menggunakan port 443
+  DEV_HOST: 'manapp.mad24.dpdns.org',
+  PRODUCTION_URL,
 };
 
 export default API_CONFIG;
