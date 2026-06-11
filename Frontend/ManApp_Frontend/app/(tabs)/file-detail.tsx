@@ -94,7 +94,7 @@ export default function FileDetail() {
 
         const urlValue = record?.[`${String(docKey)}_url`] || null;
         const pathValue = record?.[String(docKey)] || null;
-        const resolved = urlValue || buildFileUrl(pathValue);
+        const resolved = buildFileUrl(pathValue) || urlValue;
         if (resolved) {
           setCurrentFileUri(buildCacheBustedUrl(resolved));
         }
@@ -154,7 +154,7 @@ export default function FileDetail() {
           String(docKey)
         );
         // Paksa refresh data dari API setelah upload
-        const uploadedUrl = uploaded?.url || buildFileUrl(uploaded?.path);
+        const uploadedUrl = buildFileUrl(uploaded?.path) || uploaded?.url;
         if (uploadedUrl) {
           setCurrentFileUri(buildCacheBustedUrl(uploadedUrl));
         }

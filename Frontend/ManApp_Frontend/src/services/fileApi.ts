@@ -95,7 +95,9 @@ export const updateFileStatus = async (
 
 export const buildFileUrl = (path?: string | null) => {
   if (!path) return null;
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  // Force HTTPS — Android 9+ blocks cleartext HTTP by default in production APKs
+  if (path.startsWith('http://')) return path.replace('http://', 'https://');
+  if (path.startsWith('https://')) return path;
   const normalized = path.replace(/^\/?storage\//, '');
   return `${API_ORIGIN}/storage/${normalized}`;
 };
