@@ -189,20 +189,42 @@ class FileController extends Controller
         $pdfFile = $validated['pdf_file'];
         $expectedDocKey = $validated['expected_doc_key'] ?? null;
 
-        // STEP 1: Tentukan tipe dokumen menggunakan VOTING (content-based)
-        // expectedDocKey hanya sebagai fallback jika deteksi gagal
+        // STEP 1: Tentukan tipe dokumen berdasarkan KONTEN (keywords + AI)
+        // Nama file BEBAS — tidak ada pengecekan nama file
         $type = null;
         $aiDetection = null;
-        $originalName = $pdfFile->getClientOriginalName();
         $votes = [];
 
-        // Form checklist: skip Gemini (sering timeout/error), pakai parser saja
-        $skipFormChecklist = $expectedDocKey && in_array($expectedDocKey, ['form_checklist_sebelum_acara', 'form_checklist_setelah_acara']);
+        // Form checklist types
+        $formChecklistTypes = ['form_checklist_sebelum_acara', 'form_checklist_setelah_acara'];
 
-        // --- Detector 1: AI (Gemini) ---
+        // Implicit vote dari expectedDocKey (dari halaman checklist)
+        if ($expectedDocKey) {
+            $votes[$expectedDocKey] = ($votes[$expectedDocKey] ?? 0) + 1;
+        }
+
+        // --- Detector 1: Keyword Matching dari teks PDF ---
+        $text = '';
+        $keywordType = null;
+        $textExtracted = false;
+        try {
+            $text = $this->extractTextFromPdf($pdfFile->getRealPath());
+            $textExtracted = true;
+            $keywordType = $this->detectTypeByKeywords($text);
+            if ($keywordType) {
+                $votes[$keywordType] = ($votes[$keywordType] ?? 0) + 1;
+            }
+        } catch (\Exception $e) {
+            // Ekstraksi teks gagal, lanjut
+        }
+
+        // --- Detector 2: AI (Gemini) - Optimasi untuk form checklist ---
+        // Dari checklist: sudah yakin tipenya, skip AI biar cepat
+        // Free upload: coba AI dulu, fallback kalau timeout
         $aiType = null;
         $aiConfidence = null;
-        if (!$skipFormChecklist) {
+        $skipGemini = $expectedDocKey && in_array($expectedDocKey, $formChecklistTypes);
+        if (!$skipGemini) {
             try {
                 $geminiService = app(GeminiValidationService::class);
                 $aiDetection = $geminiService->detectDocumentType(
@@ -220,27 +242,6 @@ class FileController extends Controller
             }
         }
 
-        // --- Detector 2: Nama File ---
-        $filenameType = $this->detectTypeByFilename($originalName);
-        if ($filenameType) {
-            $votes[$filenameType] = ($votes[$filenameType] ?? 0) + 1;
-        }
-
-        // --- Detector 3: Keyword Matching (butuh text dari PDF) ---
-        $text = '';
-        $keywordType = null;
-        $textExtracted = false;
-        try {
-            $text = $this->extractTextFromPdf($pdfFile->getRealPath());
-            $textExtracted = true;
-            $keywordType = $this->detectTypeByKeywords($text);
-            if ($keywordType) {
-                $votes[$keywordType] = ($votes[$keywordType] ?? 0) + 1;
-            }
-        } catch (\Exception $e) {
-            // Ekstraksi teks gagal, lanjut
-        }
-
         // --- Voting Logic ---
         if (!empty($votes)) {
             arsort($votes);
@@ -252,17 +253,12 @@ class FileController extends Controller
             } else {
                 if ($aiType && $aiConfidence === 'tinggi') {
                     $type = $aiType;
-                } elseif ($filenameType) {
-                    $type = $filenameType;
                 } elseif ($keywordType) {
                     $type = $keywordType;
                 } elseif ($expectedDocKey) {
                     $type = $expectedDocKey;
                 } elseif ($aiType) {
-                    return response()->json([
-                        'message' => 'Jenis dokumen tidak dapat ditentukan dengan pasti. ' .
-                            'Coba upload dari halaman checklist atau pastikan nama file sesuai.'
-                    ], 400);
+                    $type = $aiType;
                 }
             }
         }
@@ -272,22 +268,16 @@ class FileController extends Controller
             $type = $expectedDocKey;
         }
 
+        // Cek apakah type-nya form checklist (dari sumber mana pun)
+        $isFormChecklist = $type && in_array($type, $formChecklistTypes);
+
         // --- Final Keyword Gate: Verifikasi bahwa teks mengandung SEMUA keyword ---
-        // untuk tipe yang terdeteksi. Jika tidak cocok, reject. TIDAK ADA auto-correct!
         // Form checklist: skip validasi keyword (template bisa bervariasi)
-        if (!$skipFormChecklist && $type && $textExtracted && strlen(trim($text)) > 0) {
+        // Dari checklist: percaya pilihan user, keyword check hanya sebagai informasi
+        if (!$isFormChecklist && $type && $textExtracted && strlen(trim($text)) > 0) {
             $keywordCheckType = $this->detectTypeByKeywords($text);
 
             if ($expectedDocKey) {
-                // Jika dari checklist, wajib cocok dengan expectedDocKey
-                if ($keywordCheckType !== $expectedDocKey) {
-                    $label = $this->getTypeLabel($expectedDocKey);
-                    return response()->json([
-                        'message' => "Dokumen tidak sesuai dengan {$label}. " .
-                            'Pastikan Anda mengupload dokumen yang benar.'
-                    ], 400);
-                }
-                // Pastikan type === expectedDocKey
                 $type = $expectedDocKey;
             } else {
                 // Jika upload bebas, teks harus cocok dengan type hasil voting
@@ -307,12 +297,12 @@ class FileController extends Controller
             }
         }
 
-        // Update aiDetection jika filename atau keywords yang menentukan
+        // Update aiDetection jika keywords yang menentukan
         if ($aiDetection && $aiDetection['ai_processed'] && $aiDetection['type'] !== $type) {
             $aiDetection['type'] = $type;
             $aiDetection['is_valid'] = true;
             $aiDetection['confidence'] = 'sedang';
-            $aiDetection['explanation'] = 'Deteksi dari nama file/keywords: ' . $originalName;
+            $aiDetection['explanation'] = 'Deteksi dari keywords pada isi dokumen.';
         }
 
         // --- Jika masih tidak ada tipe, reject ---
@@ -325,7 +315,7 @@ class FileController extends Controller
 
             return response()->json([
                 'message' => 'Jenis dokumen tidak dikenali. Coba upload dari halaman checklist ' .
-                    'atau pastikan nama file sesuai.'
+                    'atau pastikan isi dokumen sesuai dengan format yang didukung.'
             ], 400);
         }
 
@@ -405,30 +395,11 @@ class FileController extends Controller
     }
 
     /**
-     * Detect document type from original filename (fast, no API needed).
+     * Detect document type from original filename (tidak digunakan lagi).
+     * Nama file PDF bebas, deteksi hanya berdasarkan konten (keywords + AI).
      */
     private function detectTypeByFilename(string $filename): ?string
     {
-        // Normalize: replace underscores and hyphens with spaces
-        $lower = strtolower(str_replace(['_', '-'], ' ', $filename));
-
-        $patterns = [
-            'form_checklist_sebelum_acara' => ['form checklist sebelum', 'checklist sebelum', 'pre event', 'sebelum acara', 'persiapan'],
-            'surat_perjanjian_kerjasama'   => ['perjanjian kerja sama', 'surat perjanjian', 'pks', 'mou', 'kerjasama'],
-            'invoice'                      => ['invoice', 'faktur', 'tagihan', 'kwitansi', 'receipt'],
-            'lembar_disposisi'             => ['lembar disposisi', 'pengembalian deposit', 'nominal deposit'],
-            'surat_izin_loading'           => ['surat izin loading', 'izin loading', 'loading barang', 'izin bawa'],
-            'form_checklist_setelah_acara' => ['form checklist setelah', 'checklist setelah', 'post event', 'setelah acara', 'serah terima', 'berita acara'],
-        ];
-
-        foreach ($patterns as $type => $keywords) {
-            foreach ($keywords as $keyword) {
-                if (str_contains($lower, $keyword)) {
-                    return $type;
-                }
-            }
-        }
-
         return null;
     }
 
