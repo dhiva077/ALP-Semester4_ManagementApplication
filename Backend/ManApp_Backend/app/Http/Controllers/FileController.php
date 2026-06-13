@@ -196,23 +196,28 @@ class FileController extends Controller
         $originalName = $pdfFile->getClientOriginalName();
         $votes = [];
 
+        // Form checklist: skip Gemini (sering timeout/error), pakai parser saja
+        $skipFormChecklist = $expectedDocKey && in_array($expectedDocKey, ['form_checklist_sebelum_acara', 'form_checklist_setelah_acara']);
+
         // --- Detector 1: AI (Gemini) ---
         $aiType = null;
         $aiConfidence = null;
-        try {
-            $geminiService = app(GeminiValidationService::class);
-            $aiDetection = $geminiService->detectDocumentType(
-                filePath: $pdfFile->getRealPath(),
-                expectedDocKey: $expectedDocKey
-            );
+        if (!$skipFormChecklist) {
+            try {
+                $geminiService = app(GeminiValidationService::class);
+                $aiDetection = $geminiService->detectDocumentType(
+                    filePath: $pdfFile->getRealPath(),
+                    expectedDocKey: $expectedDocKey
+                );
 
-            if ($aiDetection['ai_processed'] && $aiDetection['type']) {
-                $aiType = $aiDetection['type'];
-                $aiConfidence = $aiDetection['confidence'];
-                $votes[$aiType] = ($votes[$aiType] ?? 0) + 1;
+                if ($aiDetection['ai_processed'] && $aiDetection['type']) {
+                    $aiType = $aiDetection['type'];
+                    $aiConfidence = $aiDetection['confidence'];
+                    $votes[$aiType] = ($votes[$aiType] ?? 0) + 1;
+                }
+            } catch (\Exception $e) {
+                // AI gagal, lanjut
             }
-        } catch (\Exception $e) {
-            // AI gagal, lanjut
         }
 
         // --- Detector 2: Nama File ---
@@ -251,6 +256,8 @@ class FileController extends Controller
                     $type = $filenameType;
                 } elseif ($keywordType) {
                     $type = $keywordType;
+                } elseif ($expectedDocKey) {
+                    $type = $expectedDocKey;
                 } elseif ($aiType) {
                     return response()->json([
                         'message' => 'Jenis dokumen tidak dapat ditentukan dengan pasti. ' .
@@ -267,7 +274,8 @@ class FileController extends Controller
 
         // --- Final Keyword Gate: Verifikasi bahwa teks mengandung SEMUA keyword ---
         // untuk tipe yang terdeteksi. Jika tidak cocok, reject. TIDAK ADA auto-correct!
-        if ($type && $textExtracted && strlen(trim($text)) > 0) {
+        // Form checklist: skip validasi keyword (template bisa bervariasi)
+        if (!$skipFormChecklist && $type && $textExtracted && strlen(trim($text)) > 0) {
             $keywordCheckType = $this->detectTypeByKeywords($text);
 
             if ($expectedDocKey) {
